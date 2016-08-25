@@ -1,8 +1,13 @@
 defmodule Ode do
   def main(args \\ []) do
+    config_file_path = "./config.json"
+
     args
     |> parse_args
     |> process
+
+    config_file_path
+    |> read_config
   end
 
   def parse_args(args) do
@@ -23,5 +28,12 @@ defmodule Ode do
       _ -> IO.puts "another"
     end
     process (tl options)
+  end
+
+  def read_config(path) do
+    case File.read(path) do
+      {:ok, body} -> IO.puts body
+      {:error, reason} -> IO.puts reason
+    end
   end
 end
