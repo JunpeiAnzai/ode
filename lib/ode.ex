@@ -93,7 +93,6 @@ defmodule Ode do
     token_url = "https://login.live.com/oauth20_token.srf"
     redirect_url = "https://login.live.com/oauth20_desktop.srf"
     client_id = "7ee18b85-8a43-4fe0-9a44-1b965038d3d4"
-    client_secret = "z2Me1OSNiAa5snEwyZcMDFG"
     body = "client_id=" <> client_id
     <> "&redirect_uri=" <> redirect_url
     #<> "&client_secret=" <> client_secret
