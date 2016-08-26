@@ -1,13 +1,19 @@
 defmodule Ode do
+  @auth_url     "https://login.live.com/oauth20_authorize.srf"
+  @token_url    "https://login.live.com/oauth20_token.srf"
+  @redirect_uri "https://login.live.com/oauth20_desktop.srf"
+
+  @client_id    "7ee18b85-8a43-4fe0-9a44-1b965038d3d4"
+
+  @config_file_path "./config.json"
+
   def main(args \\ []) do
-    config_file_path = "./config.json"
 
     args
     |> parse_args
     |> process
 
-    config_file_path
-    |> read_config
+    read_config
 
     authentication
   end
@@ -32,25 +38,21 @@ defmodule Ode do
     process (tl options)
   end
 
-  def read_config(path) do
-    case File.read(path) do
+  def read_config() do
+    case File.read(@config_file_path) do
       {:ok, body} -> IO.puts body
       {:error, reason} -> IO.puts reason
     end
   end
 
   def authentication() do
-    auth_url = "https://login.live.com/oauth20_authorize.srf"
-    token_url = "https://login.live.com/oauth20_token.srf"
-    client_id = "7ee18b85-8a43-4fe0-9a44-1b965038d3d4"
-    redirect_url = "https://login.live.com/oauth20_desktop.srf"
-    auth_url_full = auth_url
-    <> "?client_id="
-    <> client_id
-    <> "&scope=onedrive.readwrite%20offline_access&response_type=code&redirect_uri="
-    <> redirect_url
+    auth_url_full = @auth_url
+    <> "?client_id=" <> @client_id
+    <> "&scope=onedrive.readwrite%20offline_access"
+    <> "&response_type=code"
+    <> "&redirect_uri=" <>@redirect_uri
 
-    IO.puts "Autorize this app visiging:\n"
+    IO.puts "Autorize this app visiging:"
     IO.puts auth_url_full
     response = IO.gets "enter the response uri:"
 
@@ -59,11 +61,10 @@ defmodule Ode do
   end
 
   def get_code(response_uri) do
-    c = Regex.run(~r/(?:code=)(([\w\d]+-){4}[\w\d]+)/,
-      response_uri)
-      |> tl
-      |> hd
-      |> validate_code
+    Regex.run(~r/(?:code=)(([\w\d]+-){4}[\w\d]+)/,response_uri)
+    |> tl
+    |> hd
+    |> validate_code
   end
 
   def validate_code(code) do
@@ -77,7 +78,7 @@ defmodule Ode do
     use HTTPoison.Base
 
     def process_url(url) do
-      "https://login.live.com/oauth20_token.srf"
+      url
     end
 
     def process_request_body(body) do
@@ -90,21 +91,27 @@ defmodule Ode do
   end
 
   def redeem_token(code) do
-    token_url = "https://login.live.com/oauth20_token.srf"
-    redirect_url = "https://login.live.com/oauth20_desktop.srf"
-    client_id = "7ee18b85-8a43-4fe0-9a44-1b965038d3d4"
-    body = "client_id=" <> client_id
-    <> "&redirect_uri=" <> redirect_url
-    #<> "&client_secret=" <> client_secret
+    body = "client_id=" <> @client_id
+    <> "&redirect_uri=" <> @redirect_uri
     <> "&code=" <> code
     <> "&grant_type=authorization_code"
     header = %{"Content-Type": "application/x-www-form-urlencoded"}
 
-    OneDrive.start
-    OneDrive.process_request_body(body)
-    OneDrive.process_request_headers(header)
-    #response = OneDrive.post(token_url, body, header)
-    response = HTTPoison.post!(token_url, body, header, [])
-    IO.puts inspect response
+    case OneDrive.post(@token_url, body, header) do
+      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
+        aquire_token(body)
+      {:ok, %HTTPoison.Response{status_code: 400}} ->
+        IO.puts "failed."
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        IO.inspect reason
+    end
+  end
+
+  def aquire_token(body) do
+    tokens = Poison.decode!(body)
+
+    access_token = tokens["token_type"] <> " " <> tokens["access_token"]
+    refresh_token = tokens["refresh_token"]
+    access_token_expiration = :os.system_time(:seconds) + tokens["expires_in"]
   end
 end
