@@ -19,7 +19,6 @@ defmodule Ode do
     {:ok, pid} = TokensServer.start_link
     pid
     |> read_token
-
   end
 
   def parse_args(args) do
@@ -136,5 +135,28 @@ defmodule Ode do
     TokensServer.put(pid, :access_token, access_token)
     TokensServer.put(pid, :refresh_token, refresh_token)
     TokensServer.put(pid, :access_token_expiration, access_token_expiration)
+  end
+
+  def check_token(pid) do
+    if (:os.system_time(:seconds) >= TokensServer.get(pid, :access_token_expiration)) do
+      new_token(pid)
+    end
+  end
+
+  def new_token(pid) do
+    body = "client_id=" <> @client_id
+    <> "&redirect_uri=" <> @redirect_uri
+    <> "&refresh_token=" <> TokensServer.get(pid, :refresh_token)
+    <> "&grant_type=refresh_token"
+    header = %{"Content-Type": "application/x-www-form-urlencoded"}
+
+    case OneDrive.post(@token_url, body, header) do
+      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
+        aquire_token(body, pid)
+      {:ok, %HTTPoison.Response{status_code: 400}} ->
+        IO.puts "failed."
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        IO.inspect reason
+    end
   end
 end
