@@ -8,6 +8,9 @@ defmodule Ode do
   @config_file_path "./config.json"
   @refresh_token_path "./token.json"
 
+  defmodule Tokens do
+    defstruct client_id: "", refresh_token: "", access_token: "", access_token_expiration: 0
+  end
 
   def main(args \\ []) do
 
