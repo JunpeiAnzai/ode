@@ -72,7 +72,6 @@ defmodule Ode do
     code = String.trim(response)
     |> get_code
 
-    IO.puts code
     redeem_token(code, pid)
   end
 
