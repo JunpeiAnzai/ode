@@ -8,10 +8,6 @@ defmodule Ode do
   @config_file_path "./config.json"
   @refresh_token_path "./token.json"
 
-  defmodule Tokens do
-    defstruct client_id: "", refresh_token: "", access_token: "", access_token_expiration: 0
-  end
-
   def main(args \\ []) do
 
     args
@@ -20,7 +16,10 @@ defmodule Ode do
 
     read_config
 
-    read_token
+    {:ok, pid} = TokensServer.start_link
+    pid
+    |> read_token
+
   end
 
   def parse_args(args) do
@@ -50,16 +49,16 @@ defmodule Ode do
     end
   end
 
-  def read_token do
+  def read_token(pid) do
     case File.read(@refresh_token_path) do
       {:ok, body} ->
-        body
+        TokensServer.put(pid, :refresh_token, body)
       {:error, _} ->
-        authorize
+        authorize(pid)
     end
   end
 
-  def authorize() do
+  def authorize(pid) do
     auth_url_full = @auth_url
     <> "?client_id=" <> @client_id
     <> "&scope=onedrive.readwrite%20offline_access"
@@ -70,8 +69,11 @@ defmodule Ode do
     IO.puts auth_url_full
     response = IO.gets "enter the response uri:"
 
-    String.trim(response)
+    code = String.trim(response)
     |> get_code
+
+    IO.puts code
+    redeem_token(code, pid)
   end
 
   def get_code(response_uri) do
@@ -84,7 +86,7 @@ defmodule Ode do
   def validate_code(code) do
     case String.length(code) do
       0 -> IO.puts "empty"
-      _ -> redeem_token(code)
+      _ -> code
     end
   end
 
@@ -104,7 +106,7 @@ defmodule Ode do
     end
   end
 
-  def redeem_token(code) do
+  def redeem_token(code, pid) do
     body = "client_id=" <> @client_id
     <> "&redirect_uri=" <> @redirect_uri
     <> "&code=" <> code
@@ -113,7 +115,7 @@ defmodule Ode do
 
     case OneDrive.post(@token_url, body, header) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        aquire_token(body)
+        aquire_token(body, pid)
       {:ok, %HTTPoison.Response{status_code: 400}} ->
         IO.puts "failed."
       {:error, %HTTPoison.Error{reason: reason}} ->
@@ -121,7 +123,7 @@ defmodule Ode do
     end
   end
 
-  def aquire_token(body) do
+  def aquire_token(body, pid) do
     tokens = Poison.decode!(body)
 
     access_token = tokens["token_type"] <> " " <> tokens["access_token"]
@@ -129,6 +131,11 @@ defmodule Ode do
     access_token_expiration = :os.system_time(:seconds) + tokens["expires_in"]
 
     token_path = Path.absname(@refresh_token_path)
-    File.write(token_path, refresh_token, :line)
+    File.open!(token_path, [:write])
+    File.write!(token_path, refresh_token)
+
+    TokensServer.put(pid, :access_token, access_token)
+    TokensServer.put(pid, :refresh_token, refresh_token)
+    TokensServer.put(pid, :access_token_expiration, access_token_expiration)
   end
 end
