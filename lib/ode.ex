@@ -6,6 +6,8 @@ defmodule Ode do
   @client_id    "7ee18b85-8a43-4fe0-9a44-1b965038d3d4"
 
   @config_file_path "./config.json"
+  @refresh_token_path "./token.json"
+
 
   def main(args \\ []) do
 
@@ -15,7 +17,7 @@ defmodule Ode do
 
     read_config
 
-    authentication
+    read_token
   end
 
   def parse_args(args) do
@@ -45,7 +47,16 @@ defmodule Ode do
     end
   end
 
-  def authentication() do
+  def read_token do
+    case File.read(@refresh_token_path) do
+      {:ok, body} ->
+        body
+      {:error, _} ->
+        authorize
+    end
+  end
+
+  def authorize() do
     auth_url_full = @auth_url
     <> "?client_id=" <> @client_id
     <> "&scope=onedrive.readwrite%20offline_access"
@@ -113,5 +124,8 @@ defmodule Ode do
     access_token = tokens["token_type"] <> " " <> tokens["access_token"]
     refresh_token = tokens["refresh_token"]
     access_token_expiration = :os.system_time(:seconds) + tokens["expires_in"]
+
+    token_path = Path.absname(@refresh_token_path)
+    File.write(token_path, refresh_token, :line)
   end
 end
