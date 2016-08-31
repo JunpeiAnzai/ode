@@ -15,7 +15,12 @@ defmodule Ode.Mixfile do
   #
   # Type "mix help compile.app" for more information
   def application do
-    [applications: [:logger, :httpoison, :poison]]
+    [applications: [:logger,
+                    :httpoison,
+                    :poison,
+                    :sqlite_ecto,
+                    :ecto
+                   ]]
   end
 
   # Dependencies can be Hex packages:
@@ -30,7 +35,8 @@ defmodule Ode.Mixfile do
   defp deps do
     [
       {:httpoison, "~> 0.9.0"},
-      {:poison, "~> 2.0"},
+      {:poison, "~> 1.0"},
+      {:sqlite_ecto, "~> 1.0.0"}
     ]
   end
 end

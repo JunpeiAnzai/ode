@@ -1,5 +1,18 @@
 defmodule Ode do
+  use Application
+
   @config_file_path "./config.json"
+
+  def start(_type, _args) do
+    import Supervisor.Spec, warn: false
+
+    children = [
+      worker(Ode.Repo, [])
+    ]
+
+    opts = [strategy: :one_for_one, name: Ode.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
 
   def main(args \\ []) do
 
