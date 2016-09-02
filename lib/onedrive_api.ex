@@ -10,25 +10,41 @@ defmodule OneDriveApi do
 
   @refresh_token_path "./token.json"
 
+  defmodule OneDriveToken do
+    use HTTPoison.Base
+
+    def process_url(url) do
+      url
+    end
+
+    def process_request_body(body) do
+      body
+    end
+
+    def process_request_headers(headers) when is_map(headers) do
+      Enum.into(headers, [])
+    end
+  end
+
+  defmodule OneDriveSync do
+    use HTTPoison.Base
+
+    def process_request_headers(access_token) do
+      [Authorization: access_token]
+    end
+  end
 
   def view_changes_by_path(pid, path, status_token) do
     pid |> check_token
 
-    url =
-      @item_by_path_url <> path
+    url = @item_by_path_url <> path
     <> ":/view.delta"
     <> "?select=id,name,eTag,cTag,deleted,file,folder,fileSystemInfo,remoteItem,parentReference"
+    <> case String.valid?(status_token) do
+         :true -> "?token=" <> status_token
+       end
 
-    url = url <>
-      case String.valid?(status_token) do
-        :true -> "?token=" <> status_token
-      end
-
-    get(url)
-  end
-
-  def get(url) do
-    url
+    OneDriveSync.get!(url, TokensServer.get(pid, :access_token))
   end
 
   def read_token(pid) do
@@ -71,21 +87,6 @@ defmodule OneDriveApi do
     end
   end
 
-  defmodule OneDrive do
-    use HTTPoison.Base
-
-    def process_url(url) do
-      url
-    end
-
-    def process_request_body(body) do
-      body
-    end
-
-    def process_request_headers(headers) when is_map(headers) do
-      Enum.into(headers, [])
-    end
-  end
 
   def redeem_token(code, pid) do
     body = "client_id=" <> @client_id
@@ -94,7 +95,7 @@ defmodule OneDriveApi do
     <> "&grant_type=authorization_code"
     header = %{"Content-Type": "application/x-www-form-urlencoded"}
 
-    case OneDrive.post(@token_url, body, header) do
+    case OneDriveToken.post(@token_url, body, header) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         aquire_token(body, pid)
       {:ok, %HTTPoison.Response{status_code: 400}} ->
@@ -133,7 +134,7 @@ defmodule OneDriveApi do
     <> "&grant_type=refresh_token"
     header = %{"Content-Type": "application/x-www-form-urlencoded"}
 
-    case OneDrive.post(@token_url, body, header) do
+    case OneDriveToken.post(@token_url, body, header) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         aquire_token(body, pid)
       {:ok, %HTTPoison.Response{status_code: 400}} ->
@@ -143,7 +144,4 @@ defmodule OneDriveApi do
     end
   end
 
-  defmodule OneDriveSync do
-
-  end
 end
