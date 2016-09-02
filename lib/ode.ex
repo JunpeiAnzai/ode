@@ -25,7 +25,7 @@ defmodule Ode do
 
     {:ok, pid} = TokensServer.start_link
     pid
-    |> Tokens.read_token
+    |> OneDriveApi.read_token
 
     IO.puts "Opening the item database"
 
