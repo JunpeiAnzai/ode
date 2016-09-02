@@ -2,6 +2,7 @@ defmodule Ode do
   use Application
 
   @config_file_path "./config.json"
+  @sync_dir_path "~/ode_sync"
 
   def start(_type, _args) do
     import Supervisor.Spec, warn: false
@@ -20,11 +21,22 @@ defmodule Ode do
     |> parse_args
     |> process
 
-    read_config
+    config = read_config
 
     {:ok, pid} = TokensServer.start_link
     pid
     |> Tokens.read_token
+
+    IO.puts "Opening the item database"
+
+    sync_dir = Path.expand(@sync_dir_path)
+    unless File.exists?(sync_dir) do
+      File.mkdir!(sync_dir)
+    end
+    File.cd!(sync_dir)
+
+    IO.puts "Initializing the Synchronization Engine"
+
   end
 
   def parse_args(args) do
@@ -49,8 +61,8 @@ defmodule Ode do
 
   def read_config() do
     case File.read(@config_file_path) do
-      {:ok, body} -> IO.puts body
-      {:error, reason} -> IO.puts reason
+      {:ok, body} -> Poison.decode!(body)
+      {:error, reason} -> reason
     end
   end
 end
