@@ -35,15 +35,23 @@ defmodule OneDriveApi do
     end
   end
 
-  def view_changes_by_path(pid, path \\ [], delta_token \\ []) do
+  def view_changes_by_path(pid, path \\ [], delta_token) do
     pid |> check_token
 
-    url = @item_by_path_url <> path
-    <> ":/view.delta"
-    <> "?select=id,name,eTag,cTag,deleted,file,folder,fileSystemInfo,remoteItem,parentReference"
-    <> if String.valid?(delta_token) do
-         "?token=" <> delta_token
-       end
+    delta_token =
+      case delta_token do
+        "" ->
+          delta_token
+        _ ->
+          "?token=" <> delta_token
+      end
+
+    url =
+      @item_by_path_url <>
+      path <>
+      ":/view.delta" <>
+      "?select=id,name,eTag,cTag,deleted,file,folder,fileSystemInfo,remoteItem,parentReference" <>
+      delta_token
 
     OneDriveSync.get!(url, TokensServer.get(pid, :access_token))
   end
@@ -59,11 +67,12 @@ defmodule OneDriveApi do
   end
 
   def authorize(pid) do
-    auth_url_full = @auth_url
-    <> "?client_id=" <> @client_id
-    <> "&scope=onedrive.readwrite%20offline_access"
-    <> "&response_type=code"
-    <> "&redirect_uri=" <>@redirect_uri
+    auth_url_full =
+      @auth_url <>
+      "?client_id=" <> @client_id <>
+      "&scope=onedrive.readwrite%20offline_access" <>
+      "&response_type=code" <>
+      "&redirect_uri=" <> @redirect_uri
 
     IO.puts "Autorize this app visiging:"
     IO.puts auth_url_full
@@ -84,17 +93,20 @@ defmodule OneDriveApi do
 
   def validate_code(code) do
     case String.length(code) do
-      0 -> IO.puts "empty"
-      _ -> code
+      0 ->
+        IO.puts "empty"
+      _ ->
+        code
     end
   end
 
 
   def redeem_token(code, pid) do
-    body = "client_id=" <> @client_id
-    <> "&redirect_uri=" <> @redirect_uri
-    <> "&code=" <> code
-    <> "&grant_type=authorization_code"
+    body =
+      "client_id=" <> @client_id <>
+      "&redirect_uri=" <> @redirect_uri <>
+      "&code=" <> code <>
+      "&grant_type=authorization_code" <>
     header = %{"Content-Type": "application/x-www-form-urlencoded"}
 
     case OneDriveToken.post(@token_url, body, header) do
@@ -135,10 +147,11 @@ defmodule OneDriveApi do
 
   def new_token(pid) do
     Logger.debug "new_token"
-    body = "client_id=" <> @client_id
-    <> "&redirect_uri=" <> @redirect_uri
-    <> "&refresh_token=" <> TokensServer.get(pid, :refresh_token)
-    <> "&grant_type=refresh_token"
+    body =
+      "client_id=" <> @client_id <>
+      "&redirect_uri=" <> @redirect_uri <>
+      "&refresh_token=" <> TokensServer.get(pid, :refresh_token) <>
+      "&grant_type=refresh_token"
     header = %{"Content-Type": "application/x-www-form-urlencoded"}
 
     case OneDriveToken.post(@token_url, body, header) do
@@ -150,5 +163,4 @@ defmodule OneDriveApi do
         IO.inspect reason
     end
   end
-
 end

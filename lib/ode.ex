@@ -55,17 +55,22 @@ defmodule Ode do
 
   def process(options) do
     case hd options do
-      {:debug, true} -> IO.puts "debug"
-      {:monitor, true} -> IO.puts "monitor"
-      _ -> IO.puts "another"
+      {:debug, true} ->
+        IO.puts "debug"
+      {:monitor, true} ->
+        IO.puts "monitor"
+      _ ->
+        IO.puts "another"
     end
     process (tl options)
   end
 
   def read_config() do
     case File.read(@config_file_path) do
-      {:ok, body} -> Poison.decode!(body)
-      {:error, reason} -> reason
+      {:ok, body} ->
+        Poison.decode!(body)
+      {:error, reason} ->
+        reason
     end
   end
 

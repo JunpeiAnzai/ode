@@ -5,8 +5,10 @@ defmodule SyncEngine do
 
     delta_token =
       case token_value = TokensServer.get(pid, :delta_token) do
-        nil -> ""
-        _ -> token_value
+        nil ->
+          ""
+        _ ->
+          token_value
       end
     try do
       IO.puts "try"
@@ -16,7 +18,8 @@ defmodule SyncEngine do
 
       throw(:x)
     catch
-      :x -> IO.puts "catch x"
+      :x ->
+        IO.puts "catch x"
     end
   end
 end
