@@ -36,6 +36,9 @@ defmodule Ode do
     File.cd!(sync_dir)
 
     IO.puts "Initializing the Synchronization Engine"
+    retry_count = 3
+    perform_sync(pid, retry_count)
+
 
   end
 
@@ -63,6 +66,15 @@ defmodule Ode do
     case File.read(@config_file_path) do
       {:ok, body} -> Poison.decode!(body)
       {:error, reason} -> reason
+    end
+  end
+
+  def perform_sync(pid, retry_count) do
+    pid
+    |> SyncEngine.apply_differences
+
+    unless retry_count == 0 do
+      perform_sync(pid, retry_count - 1)
     end
   end
 end

@@ -1,4 +1,5 @@
 defmodule OneDriveApi do
+  require Logger
   @item_by_id_url "https://api.onedrive.com/v1.0/drive/items/"
   @item_by_path_url "https://api.onedrive.com/v1.0/drive/root:/"
 
@@ -34,23 +35,24 @@ defmodule OneDriveApi do
     end
   end
 
-  def view_changes_by_path(pid, path, status_token) do
+  def view_changes_by_path(pid, path \\ [], delta_token \\ []) do
     pid |> check_token
 
     url = @item_by_path_url <> path
     <> ":/view.delta"
     <> "?select=id,name,eTag,cTag,deleted,file,folder,fileSystemInfo,remoteItem,parentReference"
-    <> case String.valid?(status_token) do
-         :true -> "?token=" <> status_token
+    <> if String.valid?(delta_token) do
+         "?token=" <> delta_token
        end
 
     OneDriveSync.get!(url, TokensServer.get(pid, :access_token))
   end
 
   def read_token(pid) do
+    Logger.debug "read_token"
     case File.read(@refresh_token_path) do
-      {:ok, body} ->
-        TokensServer.put(pid, :refresh_token, body)
+      {:ok, refresh_token} ->
+        TokensServer.put(pid, :refresh_token, refresh_token)
       {:error, _} ->
         authorize(pid)
     end
@@ -122,12 +124,17 @@ defmodule OneDriveApi do
   end
 
   def check_token(pid) do
-    if (:os.system_time(:seconds) >= TokensServer.get(pid, :access_token_expiration)) do
+    Logger.debug "check_token"
+    expired_time = TokensServer.get(pid, :access_token_expiration)
+    if (is_nil(expired_time) ||
+      :os.system_time(:seconds) >= expired_time) do
+      Logger.debug "token expired"
       new_token(pid)
     end
   end
 
   def new_token(pid) do
+    Logger.debug "new_token"
     body = "client_id=" <> @client_id
     <> "&redirect_uri=" <> @redirect_uri
     <> "&refresh_token=" <> TokensServer.get(pid, :refresh_token)
