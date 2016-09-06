@@ -1,21 +1,4 @@
 defmodule SyncEngine do
-  defmodule ApiValue do
-    @expected_fields_value ~w(
-      cTag
-      eTag
-      file
-      fileSystemInfo
-      id
-      name
-      parentReference
-    )
-    def process_value(value) do
-      value
-      |> Map.take(@expected_fields_value)
-      |> Enum.map(fn{k, v} -> {String.to_atom(k), v} end)
-    end
-  end
-
   def apply_differences(pid) do
     require Logger
     Logger.debug "Applying differences"
@@ -43,8 +26,54 @@ defmodule SyncEngine do
 
   def apply_difference(values) do
     values
-    |> List.first
-    |> ApiValue.process_value
-    |> IO.inspect
+    |> hd
+    |> recognize_root_dir
+    |> skip_item
+    |> rename_item
+    |> compute_path
+    |> detect_item_type
+    |> apply_item
+    |> save_item
+
+    values
+    |> tl
+    |> apply_difference
+  end
+
+  def recognize_root_dir(value) do
+    # TODO
+    parent_reference = value[:parentReference]
+  end
+
+  def skip_item(value) do
+    # TODO
+    value
+  end
+
+  def rename_item(value) do
+    # rename the local item if it is unsynced
+    # and there is a new version of it
+    # TODO
+    value
+  end
+
+  def compute_path(value) do
+    # TODO
+    value
+  end
+
+  def detect_item_type(value) do
+    # TODO
+    value
+  end
+
+  def apply_item(value) do
+    # TODO
+    value
+  end
+
+  def save_item(value) do
+    # TODO
+    value
   end
 end

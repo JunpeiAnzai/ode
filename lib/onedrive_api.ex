@@ -30,12 +30,37 @@ defmodule OneDriveApi do
   defmodule OneDriveSync do
     use HTTPoison.Base
 
-    @expected_fields ~w(
+    @fields ~w(
       value
       @odata.nextLink
       @odata.deltaLink
       @delta.token
       @odata.context
+    )
+    @fields_value ~w(
+      cTag
+      eTag
+      file
+      fileSystemInfo
+      id
+      name
+      parentReference
+    )
+    @fields_file_system_info ~w(
+      createdDateTime
+      lastModifiedDateTime
+    )
+    @fields_parent_reference ~w(
+      driveId
+      id
+    )
+    @fields_file ~w(
+      hashes
+      mimeType
+    )
+    @fields_hashes ~w(
+      crc32Hash
+      sha1Hash
     )
 
     def process_request_headers(access_token) do
@@ -43,10 +68,55 @@ defmodule OneDriveApi do
     end
 
     def process_response_body(body) do
-      body
+      body = body
       |> Poison.decode!
-      |> Map.take(@expected_fields)
+      |> process_map(@fields)
+      |> Keyword.update!(:value, fn(values)
+        -> values
+        |> Enum.map(fn(value) -> process_value(value) end)
+      end)
+      IO.inspect body
+      body
+    end
+
+    def process_map(map, keywords) do
+      map
+      |> Map.take(keywords)
       |> Enum.map(fn{k, v} -> {String.to_atom(k), v} end)
+    end
+
+    def process_value(value) do
+      value
+      |> process_map(@fields_value)
+      |> process_keyword_list(@fields_file_system_info, :fileSystemInfo)
+      |> process_keyword_list(@fields_parent_reference, :parentReference)
+      |> process_keyword_list(@fields_file, :file)
+      |> process_hash
+    end
+
+    def process_keyword_list(list, keywords, key) do
+      case Keyword.has_key?(list, key) do
+        :true ->
+          list
+          |> Keyword.update!(key, fn(map)
+            -> map
+            |> process_map(keywords)
+          end)
+        :false ->
+          list
+      end
+    end
+
+    def process_hash(list) do
+      case Keyword.has_key?(list, :file) do
+        :true ->
+          list[:file]
+          |> Keyword.update!(:hashes, fn(map)
+            -> map
+            |> process_map(@fields_hashes)
+          end)
+        :false -> list
+      end
     end
   end
 
