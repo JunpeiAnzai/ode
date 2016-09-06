@@ -30,8 +30,23 @@ defmodule OneDriveApi do
   defmodule OneDriveSync do
     use HTTPoison.Base
 
+    @expected_fields ~w(
+      value
+      @odata.nextLink
+      @odata.deltaLink
+      @delta.token
+      @odata.context
+    )
+
     def process_request_headers(access_token) do
       [Authorization: access_token]
+    end
+
+    def process_response_body(body) do
+      body
+      |> Poison.decode!
+      |> Map.take(@expected_fields)
+      |> Enum.map(fn{k, v} -> {String.to_atom(k), v} end)
     end
   end
 
@@ -106,7 +121,8 @@ defmodule OneDriveApi do
       "client_id=" <> @client_id <>
       "&redirect_uri=" <> @redirect_uri <>
       "&code=" <> code <>
-      "&grant_type=authorization_code" <>
+      "&grant_type=authorization_code"
+
     header = %{"Content-Type": "application/x-www-form-urlencoded"}
 
     case OneDriveToken.post(@token_url, body, header) do
