@@ -68,15 +68,13 @@ defmodule OneDriveApi do
     end
 
     def process_response_body(body) do
-      body = body
+      body
       |> Poison.decode!
       |> process_map(@fields)
       |> Keyword.update!(:value, fn(values)
         -> values
         |> Enum.map(fn(value) -> process_value(value) end)
       end)
-      IO.inspect body
-      body
     end
 
     def process_map(map, keywords) do
@@ -120,6 +118,19 @@ defmodule OneDriveApi do
     end
   end
 
+  defmodule OneDriveSync2 do
+    use HTTPoison.Base
+
+    def process_request_headers(access_token) do
+      [Authorization: access_token]
+    end
+
+   def process_response_body(body) do
+      body
+      |> Poison.decode!()
+    end
+  end
+
   def view_changes_by_path(pid, path \\ [], delta_token) do
     pid |> check_token
 
@@ -138,7 +149,7 @@ defmodule OneDriveApi do
       "?select=id,name,eTag,cTag,deleted,file,folder,fileSystemInfo,remoteItem,parentReference" <>
       delta_token
 
-    OneDriveSync.get!(url, TokensServer.get(pid, :access_token))
+    OneDriveSync2.get!(url, TokensServer.get(pid, :access_token))
   end
 
   def read_token(pid) do
