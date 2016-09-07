@@ -3,7 +3,7 @@ defmodule Ode.Item do
 
   @primary_key false
   schema "items" do
-    field :file_id, :string, primary_key: true
+    field :id, :string, primary_key: true
     field :name, :string
     field :type, :string
     field :etag, :string

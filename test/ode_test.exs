@@ -9,9 +9,9 @@ defmodule OdeTest do
 
   test "that should insert item normally" do
     # assert we can insert and query a user
-    file_id = :rand.uniform |> to_string
+    id = :rand.uniform |> to_string
     {:ok, some_item} = %Item{name: "item_name",
-                             file_id: file_id,
+                             id: id,
                              type: "item_type",
                              etag: "item_etag",
                              ctag: "item_ctag",
@@ -20,8 +20,8 @@ defmodule OdeTest do
                           |> Repo.insert
     [file_id] =
       Item
-      |> select([item], item.file_id)
-      |> where([item], item.file_id == ^some_item.file_id)
+      |> select([item], item.id)
+      |> where([item], item.id == ^some_item.id)
       |> Repo.all
   end
 end

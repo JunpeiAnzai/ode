@@ -9,9 +9,11 @@ defmodule ItemDB do
   def update
   def upsert
   def selectChildren
-  def selectById(file_id) do
-    query = from i in Item, select: i, where: i.file_id == ^file_id
-    Repo.all(query)
+  def selectById(id) do
+    Item
+    |> select([item], item)
+    |> where([item], item.id == ^id)
+    |> Repo.all
   end
   def selectByPath
   def deleteById

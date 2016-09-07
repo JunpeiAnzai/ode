@@ -1,4 +1,5 @@
 defmodule SyncEngine do
+  require Logger
   def apply_differences(pid) do
     require Logger
     Logger.debug "Applying differences"
@@ -58,8 +59,16 @@ defmodule SyncEngine do
     # rename the local item if it is unsynced
     # and there is a new version of it
     # TODO
-    value["id"]
-    |> ItemDB.selectById
+    item =
+      value["id"]
+      |> ItemDB.selectById
+
+    if not Enum.empty?(item) and item[:etag] != value["id"] do
+      old_path = ItemDB.computePath(item[:id])
+      Logger.debug "The local item is unsynced, renaming"
+
+    end
+
   end
 
   def compute_path(value) do
