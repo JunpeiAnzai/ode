@@ -66,7 +66,6 @@ defmodule SyncEngine do
     if not Enum.empty?(item) and item[:etag] != value["id"] do
       old_path = ItemDB.computePath(item[:id])
       Logger.debug "The local item is unsynced, renaming"
-
     end
 
   end

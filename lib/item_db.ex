@@ -19,5 +19,29 @@ defmodule ItemDB do
   def deleteById
   def hasParent
   def buildItem
-  def computePath
+  def computePath(id, path \\ []) do
+    item = Item
+    |> select([item], {item.name, item.parent_id})
+    |> where([item], item.id == ^id)
+    |> Repo.all
+
+    path = case {item, item.name, item.parent_id} do
+             {[], _, _}
+               -> []
+             {_, _, nil}
+               -> case Enum.empty?(path) do
+                    :true -> "."
+                    :false -> "./" <> path
+                  end
+               {_, _, _}
+               -> case Enum.empty?(path) do
+                    :true -> item.name
+                    :false -> item.name <> "/" <> path
+                  end
+           end
+
+    unless Enum.empty?(path) do
+      computePath(id, path)
+    end
+  end
 end
