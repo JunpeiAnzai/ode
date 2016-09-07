@@ -1,5 +1,5 @@
 defmodule Ode.Item do
-  use Ecto.Model
+  use Ecto.Schema
 
   @primary_key false
   schema "items" do

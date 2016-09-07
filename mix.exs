@@ -18,9 +18,11 @@ defmodule Ode.Mixfile do
     [applications: [:logger,
                     :httpoison,
                     :poison,
-                    :sqlite_ecto,
+                    :postgrex,
                     :ecto
-                   ]]
+                   ],
+     mod: {Ode, []}
+    ]
   end
 
   # Dependencies can be Hex packages:
@@ -36,7 +38,8 @@ defmodule Ode.Mixfile do
     [
       {:httpoison, "~> 0.9.0"},
       {:poison, "~> 1.0"},
-      {:sqlite_ecto, "~> 1.0.0"}
+      {:ecto, "~> 2.0.0"},
+      {:postgrex, ">= 0.0.0"}
     ]
   end
 end

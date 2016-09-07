@@ -2,10 +2,14 @@
 # and its dependencies with the aid of the Mix.Config module.
 use Mix.Config
 
+config :ode, ecto_repos: [Ode.Repo]
 config :ode, Ode.Repo,
-  adapter: Sqlite.Ecto,
-  database: "ode.sqlite3"
-
+  adapter: Ecto.Adapters.Postgres,
+  database: "ode",
+  username: "ode",
+  password: "",
+  host: "localhost",
+  port: "5432"
 
 # This configuration is loaded before any dependency and is restricted
 # to this project. If another project depends on this project, this

@@ -5,7 +5,7 @@ defmodule Ode do
   @sync_dir_path "~/ode_sync"
 
   def start(_type, _args) do
-    import Supervisor.Spec, warn: false
+    import Supervisor.Spec, warn: true
 
     children = [
       worker(Ode.Repo, [])

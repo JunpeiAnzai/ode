@@ -7,11 +7,6 @@ defmodule OdeTest do
 
   import Ecto.Query
 
-  setup_all do
-    {:ok, pid} = Ode.start(nil, nil)
-    {:ok, [pid: pid]}
-  end
-
   test "that should insert item normally" do
     # assert we can insert and query a user
     file_id = :rand.uniform |> to_string
