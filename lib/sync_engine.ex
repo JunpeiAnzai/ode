@@ -32,7 +32,6 @@ defmodule SyncEngine do
       |> recognize_root_dir
       |> skip_item
       |> rename_item
-      |> compute_path
       |> detect_item_type
       |> apply_item
       |> save_item
@@ -63,16 +62,64 @@ defmodule SyncEngine do
       value["id"]
       |> ItemDB.selectById
 
-    if not Enum.empty?(item) and item[:etag] != value["id"] do
+    if not Enum.empty?(item)
+    and not String.equivalent?(item[:etag], value["id"]) do
       old_path = ItemDB.computePath(item[:id])
-      Logger.debug "The local item is unsynced, renaming"
+      if is_item_synced?(item, path) do
+        Logger.debug "The local item is unsynced, renaming"
+        if File.exists?(path) do
+          safe_rename(path)
+        end
+      end
     end
-
   end
 
-  def compute_path(value) do
-    # TODO
-    value
+  def is_item_synced?(item, path) do
+    result = if File.exists?(path) do
+      case item.type do
+        "file"
+          -> case File.lstat(path) do
+               {:ok, stat}
+               -> local_mtime = stat.mtime
+               if local_mtime == item.mtime do
+                 true
+               end
+               if crc32(path) == item.crc32 do
+                 true
+               end
+               {:error, posix}
+               -> false
+               _
+               -> false
+             end
+          "dir"
+          -> File.dir?(path)
+      end
+    end
+    result
+  end
+
+  def crc32(path) do
+    File.read!(path)
+    |> :erlang.crc32(str)
+    |> Integer.to_string(16)
+  end
+
+  def safe_rename(path) do
+    device_name = :inet.gethostname
+    ext = Path.extname(path)
+    new_path = String.trim_trailing(path, ext) <> "-" <> device_name
+    if File.exists?(new_path) do
+      n = 2
+      new_path2 = ""
+
+      new_path2 = new_path <> "-" <> Integer.to_string(n)
+      n = n + 1
+
+
+    end
+      
+    end
   end
 
   def detect_item_type(value) do
