@@ -64,7 +64,7 @@ defmodule SyncEngine do
 
     if not Enum.empty?(item)
     and not String.equivalent?(item[:etag], value["id"]) do
-      old_path = ItemDB.computePath(item[:id])
+      path = ItemDB.computePath(item[:id])
       if is_item_synced?(item, path) do
         Logger.debug "The local item is unsynced, renaming"
         if File.exists?(path) do
@@ -101,24 +101,32 @@ defmodule SyncEngine do
 
   def crc32(path) do
     File.read!(path)
-    |> :erlang.crc32(str)
+    |> :erlang.crc32
     |> Integer.to_string(16)
   end
 
   def safe_rename(path) do
-    device_name = :inet.gethostname
+    device_name = case :inet.gethostname do
+                    {:ok, host_name}
+                      -> to_string host_name
+                    {:error, _}
+                      -> Logger.debug "error in safe_rename"
+                  end
     ext = Path.extname(path)
-    new_path = String.trim_trailing(path, ext) <> "-" <> device_name
+    new_path = String.trim_trailing(path, ext) <> "-" <> device_name <> ext
+    |> create_new_path
+
+    File.rename(path, new_path)
+  end
+
+  defp create_new_path(new_path, n \\ 2) do
     if File.exists?(new_path) do
-      n = 2
-      new_path2 = ""
-
-      new_path2 = new_path <> "-" <> Integer.to_string(n)
-      n = n + 1
-
-
-    end
-      
+      ext = Path.extname(new_path)
+      new_path = String.trim_trailing(new_path, ext)
+      <> "-" <> Integer.to_string(n) <> ext
+      create_new_path(new_path, n + 1)
+    else
+      new_path
     end
   end
 
