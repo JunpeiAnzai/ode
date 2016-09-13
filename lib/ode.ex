@@ -27,6 +27,8 @@ defmodule Ode do
     pid
     |> OneDriveApi.read_token
 
+    :ets.new(:file_list, [:bag, :protected, :named_table])
+
     IO.puts "Opening the item database"
 
     sync_dir = Path.expand(@sync_dir_path)

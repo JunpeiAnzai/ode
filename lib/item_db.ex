@@ -9,16 +9,24 @@ defmodule ItemDB do
   def update
   def upsert
   def selectChildren
+
   def selectById(id) do
     Item
     |> select([item], item)
     |> where([item], item.id == ^id)
     |> Repo.all
   end
+
   def selectByPath
-  def deleteById
+
+  def deleteById(id) do
+    Repo.get!(Item, id)
+    |> Repo.delete!
+  end
+
   def hasParent
   def buildItem
+
   def computePath(id, path \\ []) do
     item = Item
     |> select([item], {item.name, item.parent_id})

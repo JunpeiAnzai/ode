@@ -1,5 +1,6 @@
 defmodule SyncEngine do
   require Logger
+  paths_to_delete = []
   def apply_differences(pid) do
     require Logger
     Logger.debug "Applying differences"
@@ -63,7 +64,7 @@ defmodule SyncEngine do
       |> ItemDB.selectById
 
     if not Enum.empty?(item)
-    and not String.equivalent?(item[:etag], value["id"]) do
+    and not String.equivalent?(item[:etag], value["eTag"]) do
       path = ItemDB.computePath(item[:id])
       if is_item_synced?(item, path) do
         Logger.debug "The local item is unsynced, renaming"
@@ -72,6 +73,7 @@ defmodule SyncEngine do
         end
       end
     end
+    value
   end
 
   def is_item_synced?(item, path) do
@@ -87,7 +89,7 @@ defmodule SyncEngine do
                if crc32(path) == item.crc32 do
                  true
                end
-               {:error, posix}
+               {:error, _}
                -> false
                _
                -> false
@@ -132,7 +134,21 @@ defmodule SyncEngine do
 
   def detect_item_type(value) do
     # TODO
-    value
+    cond do
+      Map.has_key?(value, "deleted") ->
+        IO.puts "file"
+        item =
+          value["id"]
+          |> ItemDB.selectById
+        if not Enum.empty?(item) do
+          ItemDB.deleteById(item[:id])
+          :ets.insert(:file_list, {:to_delete, ItemDB.computePath(item[:id])})
+        end
+      Map.has_key?(value, "folder") ->
+        IO.puts "folder"
+      Map.has_key?(value, "deleted") ->
+        IO.puts "deleted"
+    end
   end
 
   def apply_item(value) do

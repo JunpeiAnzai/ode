@@ -7,7 +7,7 @@ defmodule OdeTest do
 
   import Ecto.Query
 
-  test "that should insert item normally" do
+  test "that should insert and delete item normally" do
     # assert we can insert and query a user
     id = :rand.uniform |> to_string
     {:ok, some_item} = %Item{name: "item_name",
@@ -17,12 +17,20 @@ defmodule OdeTest do
                              ctag: "item_ctag",
                              mtime: "item_mtime",
                              crc32: "item_crc32"}
-                          |> Repo.insert
-    [file_id] =
+                             |> Repo.insert
+    inserted_id =
       Item
       |> select([item], item.id)
       |> where([item], item.id == ^some_item.id)
       |> Repo.all
+
+    assert not Enum.empty?(inserted_id)
+
+    is_deleted =
+      Repo.get!(Item, hd inserted_id)
+      |> Repo.delete
+
+    assert elem(is_deleted, 0) == :ok
   end
 
   test "that should rename the file" do
