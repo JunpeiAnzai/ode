@@ -156,7 +156,7 @@ defmodule SyncEngine do
     new_item = %Ode.Item{}
 
     ctag = value["cTag"]
-    %{new_item | ctag: ctag}
+    %{ne
 
     mtime = value["fileSystemInfo"]["lastModifiedDateTime"]
     %{new_item | mtime: mtime}

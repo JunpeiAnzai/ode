@@ -8,7 +8,7 @@ defmodule OdeTest do
   import Ecto.Query
 
   test "that should insert and delete item normally" do
-    # assert we can insert and query a user
+    # assert we can insert and query a item
     id = :rand.uniform |> to_string
     {:ok, some_item} = %Item{name: "item_name",
                              id: id,
@@ -31,6 +31,38 @@ defmodule OdeTest do
       |> Repo.delete
 
     assert elem(is_deleted, 0) == :ok
+  end
+
+  test "that should select item by id normally" do
+    id = :rand.uniform |> to_string
+    {:ok, some_item} = %Item{name: "item_name",
+                             id: id,
+                             type: "item_type",
+                             etag: "item_etag",
+                             ctag: "item_ctag",
+                             mtime: "item_mtime",
+                             crc32: "item_crc32"}
+                             |> Repo.insert
+    item = hd ItemDB.selectById(id)
+
+    assert id == item.id
+
+    Repo.get!(Item, id)
+    |> Repo.delete!
+  end
+
+  test "that should delete item by id normally" do
+    id = :rand.uniform |> to_string
+    {:ok, some_item} = %Item{name: "item_name",
+                             id: id,
+                             type: "item_type",
+                             etag: "item_etag",
+                             ctag: "item_ctag",
+                             mtime: "item_mtime",
+                             crc32: "item_crc32"}
+                             |> Repo.insert
+
+    assert ItemDB.deleteById(id)
   end
 
   test "that should rename the file" do

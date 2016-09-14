@@ -20,8 +20,13 @@ defmodule ItemDB do
   def selectByPath
 
   def deleteById(id) do
-    Repo.get!(Item, id)
-    |> Repo.delete!
+    result = Repo.get!(Item, id)
+    |> Repo.delete
+
+    case result do
+      {:ok, _} -> :true
+      {:error, _} -> :false
+    end
   end
 
   def hasParent
