@@ -23,11 +23,10 @@ defmodule Ode do
 
     config = read_config
 
-    {:ok, pid} = TokensServer.start_link
-    pid
-    |> OneDriveApi.read_token
+    :ets.new(:tokens, [:set, :protected, :named_table])
+    OneDriveApi.read_token
 
-    :ets.new(:file_list, [:bag, :protected, :named_table])
+    :ets.new(:file_list, [:set, :protected, :named_table])
 
     IO.puts "Opening the item database"
 
@@ -39,8 +38,7 @@ defmodule Ode do
 
     IO.puts "Initializing the Synchronization Engine"
     retry_count = 1
-    perform_sync(pid, retry_count)
-
+    perform_sync(retry_count)
 
   end
 
@@ -76,12 +74,11 @@ defmodule Ode do
     end
   end
 
-  def perform_sync(pid, retry_count) do
-    pid
-    |> SyncEngine.apply_differences
+  def perform_sync(retry_count) do
+    SyncEngine.apply_differences
 
     unless retry_count == 0 do
-      perform_sync(pid, retry_count - 1)
+      perform_sync(retry_count - 1)
     end
   end
 end

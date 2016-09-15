@@ -1,20 +1,20 @@
 defmodule SyncEngine do
   require Logger
 
-  def apply_differences(pid) do
+  def apply_differences do
     Logger.debug "Applying differences"
 
     delta_token =
-      case token_value = TokensServer.get(pid, :delta_token) do
-        nil ->
+      case token_value = :ets.lookup(:tokens, :delta_token) do
+        [] ->
           ""
         _ ->
-          token_value
+          Keyword.get(token_value, :delta_token)
       end
     try do
       IO.puts "try"
       changes =
-        OneDriveApi.view_changes_by_path(pid, "/", delta_token)
+        OneDriveApi.view_changes_by_path("/", delta_token)
 
       changes.body["value"]
       |> apply_difference
@@ -29,8 +29,8 @@ defmodule SyncEngine do
     with {:ok, value} <- pickup(values),
          items = value |> add_cached_tag |> rename_item,
          {:ok} <- skip_item(value),
-         {:ok, items} <- detect_item_type(items) do
-      items
+         {:ok, typed_items} <- detect_item_type(items) do
+      typed_items
       |> apply_item
       |> save_item
       IO.puts "picked"
@@ -85,15 +85,15 @@ defmodule SyncEngine do
     Map.new(
       [{:value, value},
        {:old_item, old_item},
-       {:is_cached, not Enum.empty?(old_item)}])
+       {:is_cached, not Enum.empty?(old_item)},
+       {:path, nil},
+       {:type, nil}])
   end
 
   def rename_item(items) do
     # rename the local item if it is unsynced
     # and there is a new version of it
-    is_equivalent =
-      String.equivalent?(items.old_item[:etag], items.value["eTag"])
-    if items.is_cached and not is_equivalent do
+    if items.is_cached and not is_equivalent?(items) do
       path = ItemDB.computePath(items.old_item[:id])
       unless is_item_synced?(items.old_item, path) do
         Logger.debug "The local item is unsynced, renaming"
@@ -104,6 +104,10 @@ defmodule SyncEngine do
       end
     end
     items
+  end
+
+  def is_equivalent?(items) do
+    String.equivalent?(items.old_item[:etag], items.value["eTag"])
   end
 
   def is_item_synced?(item, path) do
@@ -165,6 +169,7 @@ defmodule SyncEngine do
     end
 
     Map.put(items, :path, path)
+    IO.inspect items
     cond do
       Map.has_key?(items.value, "deleted") ->
         if items.is_cached do
@@ -176,16 +181,20 @@ defmodule SyncEngine do
         end
         {:skip}
       Map.has_key?(items.value, "file") ->
-        skip_file_regex = :ets.lookup(:file_list, {:skip_file_regex})
-        if String.match?(path, skip_file_regex) do
+        skip_file_regex =
+          Keyword.get(
+            :ets.lookup(:file_list, {:skip_file_regex}), :skip_file_regex)
+        if not is_nil(skip_file_regex) and String.match?(path, skip_file_regex) do
           {:skip}
         else
           Map.put(items, :type, :file)
           {:ok, items}
         end
       Map.has_key?(items.value, "folder") ->
-        skip_dir_regex = :ets.lookup(:file_list, {:skip_dir_regex})
-        if String.match?(path, skip_dir_regex) do
+        skip_dir_regex =
+          Keyword.get(
+            :ets.lookup(:file_list, {:skip_dir_regex}), :skip_dir_regex)
+        if not is_nil(skip_dir_regex) and String.match?(path, skip_dir_regex) do
           skip_item =
             :ets.lookup(:file_list, :to_skip_id)
             |> Tuple.append(items.value["id"])

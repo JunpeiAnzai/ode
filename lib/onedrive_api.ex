@@ -141,13 +141,13 @@ defmodule OneDriveApi do
     %HTTPoison.Response{body: body} = HTTPoison.get!(url)
   end
 
-  def view_changes_by_path(pid, path \\ [], delta_token) do
-    pid |> check_token
+  def view_changes_by_path(path \\ [], delta_token) do
+    check_token
 
-    delta_token =
+    token =
       case delta_token do
         "" ->
-          delta_token
+          ""
         _ ->
           "?token=" <> delta_token
       end
@@ -157,22 +157,24 @@ defmodule OneDriveApi do
       path <>
       ":/view.delta" <>
       "?select=id,name,eTag,cTag,deleted,file,folder,fileSystemInfo,remoteItem,parentReference" <>
-      delta_token
+      token
 
-    OneDriveSync2.get!(url, TokensServer.get(pid, :access_token))
+    access_token =
+      Keyword.get(:ets.lookup(:tokens, :access_token), :access_token)
+    OneDriveSync2.get!(url, access_token)
   end
 
-  def read_token(pid) do
+  def read_token do
     Logger.debug "read_token"
     case File.read(@refresh_token_path) do
       {:ok, refresh_token} ->
-        TokensServer.put(pid, :refresh_token, refresh_token)
+        :ets.insert(:tokens, {:refresh_token, refresh_token})
       {:error, _} ->
-        authorize(pid)
+        authorize
     end
   end
 
-  def authorize(pid) do
+  def authorize do
     auth_url_full =
       @auth_url <>
       "?client_id=" <> @client_id <>
@@ -184,10 +186,9 @@ defmodule OneDriveApi do
     IO.puts auth_url_full
     response = IO.gets "enter the response uri:"
 
-    code = String.trim(response)
+    String.trim(response)
     |> get_code
-
-    redeem_token(code, pid)
+    |> redeem_token
   end
 
   def get_code(response_uri) do
@@ -207,7 +208,7 @@ defmodule OneDriveApi do
   end
 
 
-  def redeem_token(code, pid) do
+  def redeem_token(code) do
     body =
       "client_id=" <> @client_id <>
       "&redirect_uri=" <> @redirect_uri <>
@@ -218,7 +219,7 @@ defmodule OneDriveApi do
 
     case OneDriveToken.post(@token_url, body, header) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        aquire_token(body, pid)
+        aquire_token(body)
       {:ok, %HTTPoison.Response{status_code: 400}} ->
         IO.puts "failed."
       {:error, %HTTPoison.Error{reason: reason}} ->
@@ -226,7 +227,7 @@ defmodule OneDriveApi do
     end
   end
 
-  def aquire_token(body, pid) do
+  def aquire_token(body) do
     tokens = Poison.decode!(body)
 
     access_token = tokens["token_type"] <> " " <> tokens["access_token"]
@@ -237,33 +238,38 @@ defmodule OneDriveApi do
     File.open!(token_path, [:write])
     File.write!(token_path, refresh_token)
 
-    TokensServer.put(pid, :access_token, access_token)
-    TokensServer.put(pid, :refresh_token, refresh_token)
-    TokensServer.put(pid, :access_token_expiration, access_token_expiration)
+    :ets.insert(:tokens, {:access_token, access_token})
+    :ets.insert(:tokens, {:refresh_token, refresh_token})
+    :ets.insert(:tokens, {:access_token_expiration, access_token_expiration})
   end
 
-  def check_token(pid) do
+  def check_token do
     Logger.debug "check_token"
-    expired_time = TokensServer.get(pid, :access_token_expiration)
+    expired_time =
+      Keyword.get(
+        :ets.lookup(
+          :tokens, :access_token_expiration), :access_token_expiration)
     if (is_nil(expired_time) ||
       :os.system_time(:seconds) >= expired_time) do
       Logger.debug "token expired"
-      new_token(pid)
+      new_token
     end
   end
 
-  def new_token(pid) do
+  def new_token do
     Logger.debug "new_token"
+    refresh_token =
+      Keyword.get(:ets.lookup(:tokens, :refresh_token), :refresh_token)
     body =
       "client_id=" <> @client_id <>
       "&redirect_uri=" <> @redirect_uri <>
-      "&refresh_token=" <> TokensServer.get(pid, :refresh_token) <>
+      "&refresh_token=" <> refresh_token <>
       "&grant_type=refresh_token"
     header = %{"Content-Type": "application/x-www-form-urlencoded"}
 
     case OneDriveToken.post(@token_url, body, header) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        aquire_token(body, pid)
+        aquire_token(body)
       {:ok, %HTTPoison.Response{status_code: 400}} ->
         IO.puts "failed."
       {:error, %HTTPoison.Error{reason: reason}} ->
