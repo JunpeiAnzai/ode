@@ -131,6 +131,16 @@ defmodule OneDriveApi do
     end
   end
 
+  def download_by_id(id, path) do
+    # TODO check token expiration
+    url = @item_by_id_url <> id <> "/content?AVOverride=1"
+    download(url, path)
+  end
+
+  def download(url, filename) do
+    %HTTPoison.Response{body: body} = HTTPoison.get!(url)
+  end
+
   def view_changes_by_path(pid, path \\ [], delta_token) do
     pid |> check_token
 
