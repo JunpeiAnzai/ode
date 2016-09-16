@@ -1,6 +1,10 @@
 defmodule SyncEngine do
   require Logger
 
+  defmodule Items do
+    defstruct value: nil, old_item: nil, type: nil, path: nil, is_cached: false
+  end
+
   def apply_differences do
     Logger.debug "Applying differences"
 
@@ -33,7 +37,10 @@ defmodule SyncEngine do
       typed_items
       |> apply_item
       |> save_item
-      IO.puts "picked"
+
+      apply_difference(tl(values))
+    else
+      {:skip} -> apply_difference(tl(values))
     end
     # with item_length when item_length > 0 <- length(items),
     #      item <- recognize_root_dir(hd(items)),
@@ -62,8 +69,8 @@ defmodule SyncEngine do
     end
   end
 
-  def is_root_dir?(value) do
-    String.ends_with?(value["parentReference"]["id"], "!0")
+  def is_root_dir?(parent_id) do
+    String.ends_with?(parent_id, "!0")
   end
 
   def skip_item(value) do
@@ -82,26 +89,31 @@ defmodule SyncEngine do
     old_item = value["id"]
     |> ItemDB.selectById
 
-    Map.new(
-      [{:value, value},
-       {:old_item, old_item},
-       {:is_cached, not Enum.empty?(old_item)},
-       {:path, nil},
-       {:type, nil}])
+    %Items{
+      value: value,
+      old_item: old_item,
+      is_cached: not Enum.empty?(old_item)
+    }
   end
 
   def rename_item(items) do
     # rename the local item if it is unsynced
     # and there is a new version of it
+    is_renamed =
     if items.is_cached and not is_equivalent?(items) do
-      path = ItemDB.computePath(items.old_item[:id])
+      path = ItemDB.compute_path(items.old_item[:id])
       unless is_item_synced?(items.old_item, path) do
         Logger.debug "The local item is unsynced, renaming"
         if File.exists?(path) do
           safe_rename(path)
         end
-        Map.put(items, :is_cached, false)
+        true
       end
+    end
+    items = if is_renamed do
+      %{items | is_cached: false}
+    else
+      items
     end
     items
   end
@@ -112,7 +124,7 @@ defmodule SyncEngine do
 
   def is_item_synced?(item, path) do
     result = with true <- File.exists?(path) do
-               with "file" <- item.type do
+               with :file <- item.type do
                  with {:ok, stat} <- File.lstat(path) do
                    if stat.mtime == item.mtime do
                      true
@@ -124,7 +136,7 @@ defmodule SyncEngine do
                    {:error, _} -> false
                  end
                else
-                 "dir" -> File.dir?(path)
+                 :folder -> File.dir?(path)
                end
              end
     result
@@ -162,21 +174,22 @@ defmodule SyncEngine do
   end
 
   def detect_item_type(items) do
-    path = if items.value["parentId"] do
-      ItemDB.computePath(items.value["parentId"]) <> "/" <> items.value["name"]
+    parent_id = items.value["parentReference"]["id"]
+    path = if not is_root_dir?(parent_id) do
+      ItemDB.compute_path(parent_id) <> "/" <> items.value["name"]
     else
       "."
     end
+    |> Path.expand
 
-    Map.put(items, :path, path)
-    IO.inspect items
+    items = %{items | path: path}
     cond do
       Map.has_key?(items.value, "deleted") ->
         if items.is_cached do
           ItemDB.deleteById(items.old_item[:id])
           delete_list =
             :ets.lookup(:file_list, :to_delete)
-            |> Tuple.append(ItemDB.computePath(items.old_item[:id]))
+            |> Tuple.append(ItemDB.compute_path(items.old_item[:id]))
           :ets.insert(:file_list, {:to_delete, delete_list})
         end
         {:skip}
@@ -187,7 +200,7 @@ defmodule SyncEngine do
         if not is_nil(skip_file_regex) and String.match?(path, skip_file_regex) do
           {:skip}
         else
-          Map.put(items, :type, :file)
+          items = %{items | type: :file}
           {:ok, items}
         end
       Map.has_key?(items.value, "folder") ->
@@ -201,7 +214,7 @@ defmodule SyncEngine do
           :ets.insert(:file_list, {:to_skip_id, skip_item})
           {:skip}
         else
-          Map.put(items, :type, :folder)
+          items = %{items | type: :folder}
           {:ok, items}
         end
       true ->
@@ -221,6 +234,9 @@ defmodule SyncEngine do
     etag = items.value["eTag"]
     ctag = items.value["cTag"]
     mtime = items.value["fileSystemInfo"]["lastModifiedDateTime"]
+    |> Timex.parse!("{ISO:Extended:Z}")
+    |> Timex.local
+    |> Timex.to_erl
     parent_id = items.value["parentId"]
 
     crc32 = if items.type == :file do
@@ -255,7 +271,7 @@ defmodule SyncEngine do
       case item.type do
         :file
           -> OneDriveApi.download_by_id(item.id, path)
-        :dir
+        :folder
           -> File.mkdir!(path)
       end
       File.touch!(path, item.mtime)

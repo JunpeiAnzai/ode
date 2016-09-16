@@ -19,7 +19,8 @@ defmodule Ode.Mixfile do
                     :httpoison,
                     :poison,
                     :postgrex,
-                    :ecto
+                    :ecto,
+                    :tzdata
                    ],
      mod: {Ode, []}
     ]
@@ -39,7 +40,9 @@ defmodule Ode.Mixfile do
       {:httpoison, "~> 0.9.0"},
       {:poison, "~> 1.0"},
       {:ecto, "~> 2.0.0"},
-      {:postgrex, ">= 0.0.0"}
+      {:postgrex, ">= 0.0.0"},
+      {:timex, "~> 3.0"},
+      {:tzdata, "~> 0.1.8", override: true}
     ]
   end
 end

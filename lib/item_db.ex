@@ -32,7 +32,7 @@ defmodule ItemDB do
   def hasParent
   def buildItem
 
-  def computePath(id, path \\ []) do
+  def compute_path(id, path \\ []) do
     item = Item
     |> select([item], {item.name, item.parent_id})
     |> where([item], item.id == ^id)
