@@ -2,24 +2,33 @@ defmodule ItemDB do
   alias Ode.Repo
   alias Ode.Item
 
-  import Ecto.Query
+  require Logger
 
- @file_type {:file, :dir}
-  def insert
-  def update
+  def insert(item) do
+    Repo.insert!(item)
+  end
+  def update(item) do
+    changeset = Item.changeset(item, %{
+          name: item.name,
+          is_dir: item.is_dir,
+          etag: item.etag,
+          ctag: item.ctag,
+          mtime: item.mtime,
+          parent_id: item.parent_id,
+          crc32: item.crc32
+                               })
+    Repo.update!(changeset)
+  end
   def upsert
-  def selectChildren
+  def select_children
 
-  def selectById(id) do
-    Item
-    |> select([item], item)
-    |> where([item], item.id == ^id)
-    |> Repo.all
+  def select_by_id(id) do
+    Repo.get(Item, id)
   end
 
-  def selectByPath
+  def select_by_path
 
-  def deleteById(id) do
+  def delete_by_id(id) do
     result = Repo.get!(Item, id)
     |> Repo.delete
 
@@ -29,32 +38,37 @@ defmodule ItemDB do
     end
   end
 
-  def hasParent
-  def buildItem
+  def has_parent
+  def build_item
 
-  def compute_path(id, path \\ []) do
-    item = Item
-    |> select([item], {item.name, item.parent_id})
-    |> where([item], item.id == ^id)
-    |> Repo.all
+  def compute_path(id, path \\ "") do
+    Logger.debug "initial path:" <> path
+    item = select_by_id(id)
 
-    path = case {item, item.name, item.parent_id} do
-             {[], _, _}
-               -> []
-             {_, _, nil}
-               -> case Enum.empty?(path) do
-                    :true -> "."
-                    :false -> "./" <> path
-                  end
-               {_, _, _}
-               -> case Enum.empty?(path) do
-                    :true -> item.name
-                    :false -> item.name <> "/" <> path
-                  end
-           end
-
-    unless Enum.empty?(path) do
-      computePath(id, path)
+    new_path = cond do
+      is_nil(item) ->
+        ""
+      is_nil(item.parent_id) ->
+        Logger.debug "parent directory is root"
+        if String.length(path) == 0 do
+          "."
+        else
+          "./" <> path
+        end
+      true ->
+        if String.length(path) == 0 do
+          item.name
+        else
+          item.name <> "/" <> path
+        end
     end
+
+    Logger.debug "processed path:" <> new_path
+    IO.inspect item.parent_id
+
+    if not is_nil(item.parent_id) and String.length(new_path) > 0 do
+      compute_path(item.parent_id, new_path)
+    end
+    new_path
   end
 end
