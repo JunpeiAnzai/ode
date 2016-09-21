@@ -2,7 +2,7 @@ defmodule SyncEngine do
   require Logger
 
   defmodule Items do
-    defstruct value: nil, old_item: nil, is_dir: false, path: nil, is_cached: false
+    defstruct value: nil, old_item: nil, is_dir: false, path: nil, is_cached: false, is_root: false
   end
 
   def apply_differences do
@@ -39,26 +39,11 @@ defmodule SyncEngine do
 
       apply_difference(tl(values))
     else
-      {:skip} -> apply_difference(tl(values))
+      {:skip} ->
+        apply_difference(tl(values))
+      {:error, :no_values} ->
+        IO.puts "error"
     end
-    # with item_length when item_length > 0 <- length(items),
-    #      item <- recognize_root_dir(hd(items)),
-    #      {:ok, item} <- add_cached_tag(item),
-    #      {:ok, item} <- skip_item(item),
-    #      {:ok, item} <- rename_item(item),
-    #      {:ok, item} <- detect_item_type(item),
-    #      {:ok, item} <- apply_item(item),
-    #      {:ok} <- save_item(item) do
-    #   items
-    #   |> tl
-    #   |> apply_difference
-    # else
-    #   {:skip, message} ->
-    #     IO.puts message
-    #   items
-    #   |> tl
-    #   |> apply_difference
-    # end
   end
 
   def pickup(values) do
@@ -93,7 +78,8 @@ defmodule SyncEngine do
     %Items{
       value: value,
       old_item: old_item,
-      is_cached: not is_nil(old_item)
+      is_cached: not is_nil(old_item),
+      is_root: is_root_dir?(value)
     }
   end
 
@@ -103,7 +89,7 @@ defmodule SyncEngine do
     is_renamed = false
     is_renamed =
     if items.is_cached and not is_equivalent?(items) do
-      path = ItemDB.compute_path(items.old_item[:id])
+      path = ItemDB.compute_path(items.old_item.id)
       unless is_item_synced?(items.old_item, path) do
         Logger.debug "The local item is unsynced, renaming"
         if File.exists?(path) do
@@ -117,7 +103,6 @@ defmodule SyncEngine do
     else
       items
     end
-    items
   end
 
   def is_equivalent?(items) do
@@ -163,10 +148,11 @@ defmodule SyncEngine do
   end
 
   defp create_new_path(new_path, n \\ 2) do
-    if File.exists?(new_path) do
+    new_path = if File.exists?(new_path) do
       ext = Path.extname(new_path)
       new_path = String.trim_trailing(new_path, ext)
       <> "-" <> Integer.to_string(n) <> ext
+      Logger.debug "new path is:" <> new_path
       create_new_path(new_path, n + 1)
     else
       new_path
@@ -174,9 +160,8 @@ defmodule SyncEngine do
   end
 
   def detect_item_type(items) do
-    parent_id = items.value["parentReference"]["id"]
-    IO.puts items.value["name"]
-    path = if not is_root_dir?(items.value) do
+    path = unless items.is_root do
+      parent_id = items.value["parentReference"]["id"]
       ItemDB.compute_path(parent_id) <> "/" <> items.value["name"]
     else
       "."
@@ -187,10 +172,10 @@ defmodule SyncEngine do
     cond do
       Map.has_key?(items.value, "deleted") ->
         if items.is_cached do
-          ItemDB.delete_by_id(items.old_item[:id])
+          ItemDB.delete_by_id(items.old_item.id)
           delete_list =
             :ets.lookup(:file_list, :to_delete)
-            |> Tuple.append(ItemDB.compute_path(items.old_item[:id]))
+            |> Tuple.append(ItemDB.compute_path(items.old_item.id))
           :ets.insert(:file_list, {:to_delete, delete_list})
         end
         {:skip}
@@ -239,7 +224,12 @@ defmodule SyncEngine do
     |> Timex.local
     |> Timex.to_erl
     |> Ecto.DateTime.from_erl
-    parent_id = items.value["parentId"]
+    parent_id = if items.is_root do
+      nil
+    else
+      items.value["parentReference"]["id"]
+    end
+
 
     crc32 = unless items.is_dir do
       items.value["file"]["hashes"]["crc32Hash"]
@@ -277,11 +267,13 @@ defmodule SyncEngine do
     else
       false ->
       if File.exists?(path) do
+        Logger.debug "renaming"
         safe_rename(path)
       end
       if item.is_dir do
         File.mkdir!(path)
       else
+        Logger.debug "downloading"
         OneDriveApi.download_by_id(item.id, path)
       end
       File.touch!(path, Ecto.DateTime.to_erl(item.mtime))
@@ -289,6 +281,7 @@ defmodule SyncEngine do
   end
 
   def apply_changed_item(old_item, new_item, new_path) do
+    Logger.debug "applying changed item"
     if old_item.etag != new_item.etag do
       old_path = ItemDB.compute_path(old_item.id)
       if old_path != new_path do
@@ -301,7 +294,7 @@ defmodule SyncEngine do
       end
 
       if not new_item.is_dir and old_item.ctag != new_item.ctag do
-        Logger.debug "downliading"
+        Logger.debug "downloading"
         OneDriveApi.download_by_id(new_item.id, new_path)
       end
       File.touch!(new_path, Ecto.DateTime.to_erl(new_item.mtime))

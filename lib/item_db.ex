@@ -42,14 +42,12 @@ defmodule ItemDB do
   def build_item
 
   def compute_path(id, path \\ "") do
-    Logger.debug "initial path:" <> path
     item = select_by_id(id)
 
     new_path = cond do
       is_nil(item) ->
         ""
       is_nil(item.parent_id) ->
-        Logger.debug "parent directory is root"
         if String.length(path) == 0 do
           "."
         else
@@ -63,12 +61,11 @@ defmodule ItemDB do
         end
     end
 
-    Logger.debug "processed path:" <> new_path
-    IO.inspect item.parent_id
-
+    new_path =
     if not is_nil(item.parent_id) and String.length(new_path) > 0 do
       compute_path(item.parent_id, new_path)
+    else
+      new_path
     end
-    new_path
   end
 end

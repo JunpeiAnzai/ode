@@ -125,9 +125,9 @@ defmodule OneDriveApi do
       [Authorization: access_token]
     end
 
-   def process_response_body(body) do
+    def process_response_body(body) do
       body
-      |> Poison.decode!()
+      |> Poison.decode!
     end
   end
 
@@ -138,9 +138,12 @@ defmodule OneDriveApi do
   end
 
   def download(url, path) do
-    %HTTPoison.Response{body: body} = HTTPoison.get!(url)
+    access_token = Keyword.get(:ets.lookup(:tokens, :access_token), :access_token)
+    response = OneDriveSync2.get!(url, access_token)
 
-    File.write!(path, body)
+    IO.inspect response
+
+    File.write!(path, response.body)
   end
 
   def view_changes_by_path(path \\ [], delta_token) do

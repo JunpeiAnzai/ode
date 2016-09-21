@@ -10,12 +10,13 @@ defmodule OdeTest do
   test "that should insert and delete item normally" do
     # assert we can insert and query a item
     id = :rand.uniform |> to_string
+    mtime = Timex.now |> Timex.to_erl |> Ecto.DateTime.from_erl
     {:ok, some_item} = %Item{name: "item_name",
                              id: id,
-                             type: "item_type",
+                             is_dir: false,
                              etag: "item_etag",
                              ctag: "item_ctag",
-                             mtime: "item_mtime",
+                             mtime: mtime,
                              crc32: "item_crc32"}
                              |> Repo.insert
     inserted_id =
@@ -35,15 +36,17 @@ defmodule OdeTest do
 
   test "that should select item by id normally" do
     id = :rand.uniform |> to_string
+    mtime = Timex.now |> Timex.to_erl |> Ecto.DateTime.from_erl
+
     {:ok, some_item} = %Item{name: "item_name",
                              id: id,
-                             type: "item_type",
+                             is_dir: false,
                              etag: "item_etag",
                              ctag: "item_ctag",
-                             mtime: "item_mtime",
+                             mtime: mtime,
                              crc32: "item_crc32"}
                              |> Repo.insert
-    item = hd ItemDB.selectById(id)
+    item = ItemDB.select_by_id(id)
 
     assert id == item.id
 
@@ -53,16 +56,18 @@ defmodule OdeTest do
 
   test "that should delete item by id normally" do
     id = :rand.uniform |> to_string
+    mtime = Timex.now |> Timex.to_erl |> Ecto.DateTime.from_erl
+
     {:ok, some_item} = %Item{name: "item_name",
                              id: id,
-                             type: "item_type",
+                             is_dir: false,
                              etag: "item_etag",
                              ctag: "item_ctag",
-                             mtime: "item_mtime",
+                             mtime: mtime,
                              crc32: "item_crc32"}
                              |> Repo.insert
 
-    assert ItemDB.deleteById(id)
+    assert ItemDB.delete_by_id(id)
   end
 
   test "that should rename the file" do
