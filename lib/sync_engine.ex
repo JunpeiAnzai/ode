@@ -114,12 +114,19 @@ defmodule SyncEngine do
     if item.is_dir do
       File.dir?(path)
     else
+      {:ok, stat} = File.lstat(path)
       case File.lstat(path) do
         {:ok, stat} ->
           cond do
-            stat.mtime == item.mtime -> true
-            crc32(path) == item.crc32 -> true
-            true -> false
+           stat.mtime == Ecto.DateTime.to_erl(item.mtime) ->
+              Logger.debug "fs time = db time"
+              true
+            crc32(path) == item.crc32 ->
+              Logger.debug "fs crc = db crc"
+              true
+            true ->
+              Logger.debug "not synced"
+              false
           end
         {:error, _} ->
           false
@@ -131,6 +138,12 @@ defmodule SyncEngine do
     File.read!(path)
     |> :erlang.crc32
     |> Integer.to_string(16)
+    |> String.pad_leading(8, "0")
+    |> String.to_charlist
+    |> Stream.chunk(2)
+    |> Enum.to_list
+    |> Enum.reverse
+    |> List.to_string
   end
 
   def safe_rename(path) do

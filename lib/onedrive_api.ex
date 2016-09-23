@@ -125,9 +125,23 @@ defmodule OneDriveApi do
       [Authorization: access_token]
     end
 
-    def process_response_body(body) do
-      body
+    def process_response_headers(headers) do
+      headers
       |> Poison.decode!
+    end
+
+    def process_response_body(body) do
+      unless String.length(body) == 0 do
+        body
+        |> Poison.decode!
+      end
+    end
+  end
+
+  defmodule OneDriveSync3 do
+    use HTTPoison.Base
+    def process_request_headers(access_token) do
+      [Authorization: access_token]
     end
   end
 
@@ -141,9 +155,12 @@ defmodule OneDriveApi do
     access_token = Keyword.get(:ets.lookup(:tokens, :access_token), :access_token)
     response = OneDriveSync2.get!(url, access_token)
 
-    IO.inspect response
+    resource_url = response.headers
+    |> List.keyfind("Location", 0)
+    |> elem(1)
 
-    File.write!(path, response.body)
+    resource = OneDriveSync3.get!(resource_url, access_token)
+    File.write!(path, resource.body)
   end
 
   def view_changes_by_path(path \\ [], delta_token) do
