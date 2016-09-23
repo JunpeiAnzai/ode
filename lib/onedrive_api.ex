@@ -147,23 +147,25 @@ defmodule OneDriveApi do
 
   def download_by_id(id, path) do
     check_token
-    url = @item_by_id_url <> "#{id}/content?AVOverride=1"
+    url = "#{@item_by_id_url}#{id}/content?AVOverride=1"
     download(url, path)
   end
 
   def download(url, path) do
-    access_token = Keyword.get(:ets.lookup(:tokens, :access_token), :access_token)
+    access_token =
+      Keyword.get(:ets.lookup(:tokens, :access_token), :access_token)
     response = OneDriveSync2.get!(url, access_token)
 
-    resource_url = response.headers
-    |> List.keyfind("Location", 0)
-    |> elem(1)
+    resource_url =
+      response.headers
+      |> List.keyfind("Location", 0)
+      |> elem(1)
 
     resource = OneDriveSync3.get!(resource_url, access_token)
     File.write!(path, resource.body)
   end
 
-  def view_changes_by_path(path \\ [], delta_token) do
+  def view_changes_by_path(path \\ "", delta_token) do
     check_token
 
     token =
@@ -175,9 +177,9 @@ defmodule OneDriveApi do
       end
 
     url =
-      @item_by_path_url <>
-      "#{path}:/view.delta" <>
-      "?select=id,name,eTag,cTag,deleted,file,folder,fileSystemInfo,remoteItem,parentReference#{token}"
+      "#{@item_by_path_url}#{path}:/view.delta" <>
+      "?select=id,name,eTag,cTag,deleted,file," <>
+      "folder,fileSystemInfo,remoteItem,parentReference#{token}"
 
     access_token =
       Keyword.get(:ets.lookup(:tokens, :access_token), :access_token)
@@ -196,11 +198,10 @@ defmodule OneDriveApi do
 
   def authorize do
     auth_url_full =
-      @auth_url <>
-      "?client_id=" <> @client_id <>
+      "#{@auth_url}?client_id=#{@client_id}" <>
       "&scope=onedrive.readwrite%20offline_access" <>
       "&response_type=code" <>
-      "&redirect_uri=" <> @redirect_uri
+      "&redirect_uri=#{@redirect_uri}"
 
     IO.puts "Autorize this app visiging:"
     IO.puts auth_url_full
@@ -221,7 +222,7 @@ defmodule OneDriveApi do
   def validate_code(code) do
     case String.length(code) do
       0 ->
-        IO.puts "empty"
+        Logger.debug "empty code"
       _ ->
         code
     end
@@ -230,8 +231,8 @@ defmodule OneDriveApi do
 
   def redeem_token(code) do
     body =
-      "client_id=" <> @client_id <>
-      "&redirect_uri=" <> @redirect_uri <>
+      "client_id=#{@client_id}" <>
+      "&redirect_uri=#{@redirect_uri}" <>
       "&code=#{code}" <>
       "&grant_type=authorization_code"
 
@@ -281,8 +282,8 @@ defmodule OneDriveApi do
     refresh_token =
       Keyword.get(:ets.lookup(:tokens, :refresh_token), :refresh_token)
     body =
-      "client_id=" <> @client_id <>
-      "&redirect_uri=" <> @redirect_uri <>
+      "client_id=#{@client_id}" <>
+      "&redirect_uri=#{@redirect_uri}" <>
       "&refresh_token=#{refresh_token}" <>
       "&grant_type=refresh_token"
     header = %{"Content-Type": "application/x-www-form-urlencoded"}
