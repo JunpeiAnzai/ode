@@ -58,14 +58,16 @@ defmodule OdeTest do
     id = :rand.uniform |> to_string
     mtime = Timex.now |> Timex.to_erl |> Ecto.DateTime.from_erl
 
-    {:ok, some_item} = %Item{name: "item_name",
-                             id: id,
-                             is_dir: false,
-                             etag: "item_etag",
-                             ctag: "item_ctag",
-                             mtime: mtime,
-                             crc32: "item_crc32"}
-                             |> Repo.insert
+    %Item{
+      name: "item_name",
+      id: id,
+      is_dir: false,
+      etag: "item_etag",
+      ctag: "item_ctag",
+      mtime: mtime,
+      crc32: "item_crc32"}
+      |> Repo.insert
+
     item = ItemDB.select_by_id(id)
 
     assert id == item.id
@@ -161,5 +163,17 @@ defmodule OdeTest do
       File.rm!(new_path)
       File.rm!(new_path2)
     end
+  end
+
+  test "that should detect the value imply root directory" do
+    value =
+      %{
+        "name" => "root",
+        "parentReference" => %{
+          "id" => "23543283219382131!0"
+        }
+      }
+
+    assert SyncEngine.is_root_dir?(value)
   end
 end
