@@ -91,6 +91,21 @@ defmodule OdeTest do
 
     assert is_inserted?
 
+    update_item = %Item{name: "new_item_name",
+                     id: id,
+                     is_dir: true,
+                     etag: "new_item_etag",
+                     ctag: "new_item_ctag",
+                     mtime: mtime,
+                     crc32: "new_item_crc32"
+                    }
+
+    ItemDB.update(update_item)
+
+    updated_item = Repo.get!(Item, id)
+
+    assert updated_item.name == "new_item_name"
+
     assert ItemDB.delete_by_id(id)
   end
 
