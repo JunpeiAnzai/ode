@@ -11,24 +11,44 @@ defmodule OdeTest do
     # assert we can insert and query a item
     id = :rand.uniform |> to_string
     mtime = Timex.now |> Timex.to_erl |> Ecto.DateTime.from_erl
-    {:ok, some_item} = %Item{name: "item_name",
-                             id: id,
-                             is_dir: false,
-                             etag: "item_etag",
-                             ctag: "item_ctag",
-                             mtime: mtime,
-                             crc32: "item_crc32"}
-                             |> Repo.insert
+
+    new_item = %Item{name: "item_name",
+                     id: id,
+                     is_dir: false,
+                     etag: "item_etag",
+                     ctag: "item_ctag",
+                     mtime: mtime,
+                     crc32: "item_crc32"
+                    }
+
+    {:ok, some_item} = new_item |> Repo.insert
+
     inserted_id =
       Item
       |> select([item], item.id)
       |> where([item], item.id == ^some_item.id)
-      |> Repo.all
+      |> Repo.one!
 
-    assert not Enum.empty?(inserted_id)
+    assert id == inserted_id
+
+    inserted_item = Repo.get!(Item, inserted_id)
+    update_sets = %{
+      name: "new_item_name",
+      is_dir: true,
+      etag: "new_item_etag",
+      ctag: "new_item_ctag",
+      crc32: "new_crc32"
+    }
+
+    Ecto.Changeset.change(inserted_item, update_sets)
+    |> Repo.update!
+
+    update_item = Repo.get!(Item, inserted_id)
+
+    assert update_item.name == "new_item_name"
 
     is_deleted =
-      Repo.get!(Item, hd inserted_id)
+      Repo.get!(Item, inserted_id)
       |> Repo.delete
 
     assert elem(is_deleted, 0) == :ok

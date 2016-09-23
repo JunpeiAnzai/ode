@@ -8,16 +8,19 @@ defmodule ItemDB do
     Repo.insert!(item)
   end
   def update(item) do
-    changeset = Item.changeset(item, %{
-          name: item.name,
-          is_dir: item.is_dir,
-          etag: item.etag,
-          ctag: item.ctag,
-          mtime: item.mtime,
-          parent_id: item.parent_id,
-          crc32: item.crc32
-                               })
-    Repo.update!(changeset)
+    changeset = %{
+          :name => item.name,
+          :is_dir => item.is_dir,
+          :etag => item.etag,
+          :ctag => item.ctag,
+          :mtime => item.mtime,
+          :parent_id => item.parent_id,
+          :crc32 => item.crc32,
+          :id => item.id
+    }
+    Repo.get!(Item, item.id)
+    |> Ecto.Changeset.cast(changeset)
+    |> Repo.update!(changeset)
   end
   def upsert
   def select_children

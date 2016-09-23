@@ -37,7 +37,7 @@ defmodule Ode do
     File.cd!(sync_dir)
 
     IO.puts "Initializing the Synchronization Engine"
-    retry_count = 1
+    retry_count = 0
     perform_sync(retry_count)
 
   end

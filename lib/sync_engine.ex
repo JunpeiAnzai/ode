@@ -86,7 +86,6 @@ defmodule SyncEngine do
   def rename_item(items) do
     # rename the local item if it is unsynced
     # and there is a new version of it
-    is_renamed = false
     is_renamed =
     if items.is_cached and not is_equivalent?(items) do
       path = ItemDB.compute_path(items.old_item.id)
@@ -126,6 +125,10 @@ defmodule SyncEngine do
               true
             true ->
               Logger.debug "not synced"
+              IO.inspect stat.mtime
+              IO.inspect item.mtime
+              IO.inspect crc32(path)
+              IO.inspect item.crc32
               false
           end
         {:error, _} ->
@@ -179,7 +182,6 @@ defmodule SyncEngine do
     else
       "."
     end
-    |> Path.expand
 
     items = %{items | path: path}
     cond do
@@ -265,8 +267,10 @@ defmodule SyncEngine do
     end
 
     unless is_nil(items.old_item) do
+      Logger.debug "updating"
       ItemDB.update(new_item)
     else
+      Logger.debug "inserting"
       ItemDB.insert(new_item)
     end
 
@@ -298,7 +302,7 @@ defmodule SyncEngine do
     if old_item.etag != new_item.etag do
       old_path = ItemDB.compute_path(old_item.id)
       if old_path != new_path do
-        Logger.debug "Moving"
+        Logger.debug "Moving from " <> old_path <> " to " <> new_path
         if File.exists?(new_path) do
           Logger.debug "The destination is occupied, renaming"
           safe_rename(new_path)
