@@ -47,7 +47,7 @@ defmodule Ode do
     options =
       args
       |> OptionParser.parse()
-    elem(options, 0)
+      |> elem(0)
   end
 
   def process([]) do
