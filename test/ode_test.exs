@@ -74,18 +74,22 @@ defmodule OdeTest do
     |> Repo.delete!
   end
 
-  test "that should delete item by id normally" do
+  test "that should insert item by item and delete item by id normally" do
     id = :rand.uniform |> to_string
     mtime = Timex.now |> Timex.to_erl |> Ecto.DateTime.from_erl
 
-    {:ok, some_item} = %Item{name: "item_name",
-                             id: id,
-                             is_dir: false,
-                             etag: "item_etag",
-                             ctag: "item_ctag",
-                             mtime: mtime,
-                             crc32: "item_crc32"}
-                             |> Repo.insert
+    new_item = %Item{name: "item_name",
+                     id: id,
+                     is_dir: false,
+                     etag: "item_etag",
+                     ctag: "item_ctag",
+                     mtime: mtime,
+                     crc32: "item_crc32"
+                    }
+
+    is_inserted? = new_item |> ItemDB.insert
+
+    assert is_inserted?
 
     assert ItemDB.delete_by_id(id)
   end

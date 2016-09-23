@@ -5,22 +5,26 @@ defmodule ItemDB do
   require Logger
 
   def insert(item) do
-    Repo.insert!(item)
+    case Repo.insert(item) do
+      {:ok, _}
+        -> true
+      {:error, _}
+        -> false
+    end
   end
   def update(item) do
     changeset = %{
-          :name => item.name,
-          :is_dir => item.is_dir,
-          :etag => item.etag,
-          :ctag => item.ctag,
-          :mtime => item.mtime,
-          :parent_id => item.parent_id,
-          :crc32 => item.crc32,
-          :id => item.id
+          name: item.name,
+          is_dir: item.is_dir,
+          etag: item.etag,
+          ctag: item.ctag,
+          mtime: item.mtime,
+          parent_id: item.parent_id,
+          crc32: item.crc32,
     }
     Repo.get!(Item, item.id)
-    |> Ecto.Changeset.cast(changeset)
-    |> Repo.update!(changeset)
+    |> Ecto.Changeset.change(changeset)
+    |> Repo.update!
   end
   def upsert
   def select_children
