@@ -12,6 +12,7 @@ defmodule ItemDB do
         -> false
     end
   end
+
   def update(item) do
     changeset = %{
           name: item.name,
@@ -36,8 +37,9 @@ defmodule ItemDB do
   def select_by_path
 
   def delete_by_id(id) do
-    result = Repo.get!(Item, id)
-    |> Repo.delete
+    result =
+      Repo.get!(Item, id)
+      |> Repo.delete
 
     case result do
       {:ok, _} -> :true

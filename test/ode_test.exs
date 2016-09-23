@@ -176,4 +176,70 @@ defmodule OdeTest do
 
     assert SyncEngine.is_root_dir?(value)
   end
+
+  test "that should compute path properly" do
+    mtime = Timex.now |> Timex.to_erl |> Ecto.DateTime.from_erl
+    root_id = "root_id"
+    sub_id = "sub_id"
+    sub_sub_id = "sub_sub_id"
+    target_id = "target_id"
+    root_dir =
+      %Item{
+        id: root_id,
+        name: "root_name",
+        is_dir: true,
+        etag: "root_etag",
+        ctag: "root_ctag",
+        mtime: mtime,
+        parent_id: nil,
+        crc32: "root_crc"
+      }
+
+    sub_dir =
+      %Item{
+        id: sub_id,
+        name: "sub_dir",
+        is_dir: true,
+        etag: "sub_etag",
+        ctag: "sub_ctag",
+        mtime: mtime,
+        parent_id: "root_id",
+        crc32: "sub_crc"
+      }
+
+    sub_sub_dir =
+      %Item{
+        id: sub_sub_id,
+        name: "sub_sub_dir",
+        is_dir: true,
+        etag: "sub_sub_etag",
+        ctag: "sub_ctag",
+        mtime: mtime,
+        parent_id: "sub_id",
+        crc32: "sub_sub_crc"
+      }
+
+    sub_sub_sub_item =
+      %Item{
+        id: target_id,
+        name: "sub_sub_sub_name",
+        is_dir: false,
+        etag: "sss_etag",
+        ctag: "sss_ctag",
+        mtime: mtime,
+        parent_id: "sub_sub_id",
+        crc32: "sss_crc"
+      }
+
+    Repo.delete(root_id)
+    Repo.delete(sub_id)
+    Repo.delete(sub_sub_id)
+    Repo.delete(target_id)
+    root_dir |> Repo.insert
+    sub_dir |> Repo.insert
+    sub_sub_dir |> Repo.insert
+    sub_sub_sub_item |> Repo.insert
+
+    assert ItemDB.compute_path(target_id) == "./sub_dir/sub_sub_dir/sub_sub_sub_name"
+  end
 end
