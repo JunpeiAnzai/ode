@@ -58,13 +58,13 @@ defmodule ItemDB do
         if String.length(path) == 0 do
           "."
         else
-          "./" <> path
+          "./#{path}"
         end
       true ->
         if String.length(path) == 0 do
           item.name
         else
-          item.name <> "/" <> path
+          item.name <> "/#{path}"
         end
     end
 

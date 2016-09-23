@@ -147,7 +147,7 @@ defmodule OneDriveApi do
 
   def download_by_id(id, path) do
     check_token
-    url = @item_by_id_url <> id <> "/content?AVOverride=1"
+    url = @item_by_id_url <> "#{id}/content?AVOverride=1"
     download(url, path)
   end
 
@@ -171,15 +171,13 @@ defmodule OneDriveApi do
         "" ->
           ""
         _ ->
-          "?token=" <> delta_token
+          "?token=#{delta_token}"
       end
 
     url =
       @item_by_path_url <>
-      path <>
-      ":/view.delta" <>
-      "?select=id,name,eTag,cTag,deleted,file,folder,fileSystemInfo,remoteItem,parentReference" <>
-      token
+      "#{path}:/view.delta" <>
+      "?select=id,name,eTag,cTag,deleted,file,folder,fileSystemInfo,remoteItem,parentReference#{token}"
 
     access_token =
       Keyword.get(:ets.lookup(:tokens, :access_token), :access_token)
@@ -234,7 +232,7 @@ defmodule OneDriveApi do
     body =
       "client_id=" <> @client_id <>
       "&redirect_uri=" <> @redirect_uri <>
-      "&code=" <> code <>
+      "&code=#{code}" <>
       "&grant_type=authorization_code"
 
     header = %{"Content-Type": "application/x-www-form-urlencoded"}
@@ -285,7 +283,7 @@ defmodule OneDriveApi do
     body =
       "client_id=" <> @client_id <>
       "&redirect_uri=" <> @redirect_uri <>
-      "&refresh_token=" <> refresh_token <>
+      "&refresh_token=#{refresh_token}" <>
       "&grant_type=refresh_token"
     header = %{"Content-Type": "application/x-www-form-urlencoded"}
 

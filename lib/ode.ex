@@ -1,5 +1,6 @@
 defmodule Ode do
   use Application
+  require Logger
 
   @config_file_path "./config.json"
   @sync_dir_path "~/ode_sync"
@@ -28,7 +29,7 @@ defmodule Ode do
 
     :ets.new(:file_list, [:set, :protected, :named_table])
 
-    IO.puts "Opening the item database"
+    Logger.debug "Opening the item database"
 
     sync_dir = Path.expand(@sync_dir_path)
     unless File.exists?(sync_dir) do
@@ -36,7 +37,7 @@ defmodule Ode do
     end
     File.cd!(sync_dir)
 
-    IO.puts "Initializing the Synchronization Engine"
+    Logger.debug "Initializing the Synchronization Engine"
     retry_count = 0
     perform_sync(retry_count)
 
@@ -50,17 +51,17 @@ defmodule Ode do
   end
 
   def process([]) do
-    IO.puts "No arguments"
+    Logger.debug "No arguments"
   end
 
   def process(options) do
     case hd options do
       {:debug, true} ->
-        IO.puts "debug"
+        Logger.debug "debug mode"
       {:monitor, true} ->
-        IO.puts "monitor"
+        Logger.debug "monitor mode"
       _ ->
-        IO.puts "another"
+        Logger.debug "another mode"
     end
     process (tl options)
   end

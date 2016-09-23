@@ -16,7 +16,6 @@ defmodule SyncEngine do
           Keyword.get(token_value, :delta_token)
       end
     try do
-      IO.puts "try"
       changes =
         OneDriveApi.view_changes_by_path("/", delta_token)
 
@@ -25,7 +24,7 @@ defmodule SyncEngine do
       throw(:x)
     catch
       :x ->
-        IO.puts "catch x"
+        Logger.debug "catch x"
     end
   end
 
@@ -42,7 +41,7 @@ defmodule SyncEngine do
       {:skip} ->
         apply_difference(tl(values))
       {:error, :no_values} ->
-        IO.puts "error"
+        Logger.debug "error in apply_difference"
     end
   end
 
@@ -157,7 +156,7 @@ defmodule SyncEngine do
                       -> Logger.debug "error in safe_rename"
                   end
     ext = Path.extname(path)
-    new_path = String.trim_trailing(path, ext) <> "-" <> device_name <> ext
+    new_path = String.trim_trailing(path, ext) <> "-#{device_name}#{ext}"
     |> create_new_path
 
     File.rename(path, new_path)
@@ -168,7 +167,7 @@ defmodule SyncEngine do
       ext = Path.extname(new_path)
       new_path = String.trim_trailing(new_path, ext)
       <> "-" <> Integer.to_string(n) <> ext
-      Logger.debug "new path is:" <> new_path
+      Logger.debug "new path is: #{new_path}"
       create_new_path(new_path, n + 1)
     else
       new_path
@@ -219,7 +218,7 @@ defmodule SyncEngine do
           {:ok, items}
         end
       true ->
-        IO.puts "unknown"
+        Logger.debug "unknown file type"
         skip_item =
           :ets.lookup(:file_list, :to_skip_id)
           |> Tuple.append(items.value["id"])
@@ -234,46 +233,42 @@ defmodule SyncEngine do
     is_dir = items.is_dir
     etag = items.value["eTag"]
     ctag = items.value["cTag"]
-    mtime = items.value["fileSystemInfo"]["lastModifiedDateTime"]
-    |> Timex.parse!("{ISO:Extended:Z}")
-    |> Timex.local
-    |> Timex.to_erl
-    |> Ecto.DateTime.from_erl
-    parent_id = if items.is_root do
-      nil
-    else
+    mtime =
+      items.value["fileSystemInfo"]["lastModifiedDateTime"]
+      |> Timex.parse!("{ISO:Extended:Z}")
+      |> Timex.local
+      |> Timex.to_erl
+      |> Ecto.DateTime.from_erl
+    parent_id = unless items.is_root do
       items.value["parentReference"]["id"]
     end
-
-
     crc32 = unless items.is_dir do
       items.value["file"]["hashes"]["crc32Hash"]
     end
 
-    new_item = %Ode.Item{
-      id: id,
-      name: name,
-      is_dir: is_dir,
-      etag: etag,
-      ctag: ctag,
-      mtime: mtime,
-      parent_id: parent_id,
-      crc32: crc32
-    }
-    unless items.is_cached do
-      apply_new_item(new_item, items.path)
-    else
+    new_item =
+      %Ode.Item{
+        id: id,
+        name: name,
+        is_dir: is_dir,
+        etag: etag,
+        ctag: ctag,
+        mtime: mtime,
+        parent_id: parent_id,
+        crc32: crc32
+      }
+
+    if items.is_cached do
       apply_changed_item(items.old_item, new_item, items.path)
-    end
-
-    unless is_nil(items.old_item) do
-      Logger.debug "updating"
-      ItemDB.update(new_item)
     else
-      Logger.debug "inserting"
-      ItemDB.insert(new_item)
+      apply_new_item(new_item, items.path)
     end
 
+    if is_nil(items.old_item) do
+      ItemDB.insert(new_item)
+    else
+      ItemDB.update(new_item)
+    end
   end
 
   def apply_new_item(item, path) do
@@ -302,7 +297,7 @@ defmodule SyncEngine do
     if old_item.etag != new_item.etag do
       old_path = ItemDB.compute_path(old_item.id)
       if old_path != new_path do
-        Logger.debug "Moving from " <> old_path <> " to " <> new_path
+        Logger.debug "Moving from #{old_path} to #{new_path}"
         if File.exists?(new_path) do
           Logger.debug "The destination is occupied, renaming"
           safe_rename(new_path)
