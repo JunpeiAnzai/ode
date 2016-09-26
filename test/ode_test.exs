@@ -231,15 +231,16 @@ defmodule OdeTest do
         crc32: "sss_crc"
       }
 
-    Repo.delete(root_id)
-    Repo.delete(sub_id)
-    Repo.delete(sub_sub_id)
-    Repo.delete(target_id)
     root_dir |> Repo.insert
     sub_dir |> Repo.insert
     sub_sub_dir |> Repo.insert
     sub_sub_sub_item |> Repo.insert
 
     assert ItemDB.compute_path(target_id) == "./sub_dir/sub_sub_dir/sub_sub_sub_name"
+
+    Repo.get!(Item, target_id) |> Repo.delete
+    Repo.get!(Item, sub_sub_id) |> Repo.delete
+    Repo.get!(Item, sub_id) |> Repo.delete
+    Repo.get!(Item, root_id) |> Repo.delete
   end
 end
