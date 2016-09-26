@@ -78,6 +78,7 @@ defmodule Ode do
   def perform_sync(retry_count) do
     SyncEngine.apply_differences
 
+    SyncEngine.scan_for_differences
     unless retry_count == 0 do
       perform_sync(retry_count - 1)
     end

@@ -314,4 +314,10 @@ defmodule SyncEngine do
       Logger.debug "The item has not changed"
     end
   end
+
+  def scan_for_differences(path \\ ".") do
+    Logger.debug "Uploading differences"
+
+
+  end
 end

@@ -25,7 +25,7 @@ defmodule Ode.Mixfile do
                     :poison,
                     :postgrex,
                     :ecto,
-                    :tzdata
+                    :tzdata,
                     :ex_machina
                    ],
      mod: {Ode, []}

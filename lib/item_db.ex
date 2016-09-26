@@ -2,6 +2,8 @@ defmodule ItemDB do
   alias Ode.Repo
   alias Ode.Item
 
+  import Ecto.Query
+
   require Logger
 
   def insert(item) do
@@ -34,7 +36,45 @@ defmodule ItemDB do
     Repo.get(Item, id)
   end
 
-  def select_by_path
+  def select_by_path(path, candidates \\ nil) do
+    if is_nil candidates do
+      candidates = {}
+      path =
+        "root/" <> String.trim_leading(path, ".")
+        |> Path.basename
+
+      ids = Repo.all(
+        from i in Item,
+        where: i.name == ^path,
+        select: [i.id, i.parent_id]
+      )
+
+      path = Path.dirname(path)
+      Tuple.append(candidates, ids)
+    end
+
+    if path != "." do
+      # discard the candidates that do not have the correct parent
+      Enum.map(candidates, fn(candidate) ->
+        parent_path = Path.basename(path)
+        parent_id = tl candidate
+        parent_item = Repo.one(
+          from i in Item,
+          where: i.name == ^parent_path and i.id == ^parent_id,
+          select: i.parent_id
+        )
+        [hd(candidate), parent_item]
+      end)
+      |> Enum.reject(fn(candidate) -> is_nil(tl candidate) end)
+      path = Path.dirname(path)
+    end
+
+    if path != "." do
+      select_by_path(path, candidates)
+    end
+
+    # reached the root
+  end
 
   def delete_by_id(id) do
     result =
