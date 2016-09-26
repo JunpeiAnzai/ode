@@ -1,11 +1,14 @@
 defmodule OdeTest do
   use ExUnit.Case
+
   doctest Ode
 
   alias Ode.Repo
   alias Ode.Item
 
   import Ecto.Query
+
+  import Ode.Factory
 
   test "that should insert and delete item normally" do
     # assert we can insert and query a item

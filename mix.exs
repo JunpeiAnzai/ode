@@ -8,8 +8,13 @@ defmodule Ode.Mixfile do
      escript: [main_module: Ode],
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
-     deps: deps()]
+     deps: deps(),
+     elixirc_paths: elixirc_paths(Mix.env)
+    ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "web", "test/support"]
+  defp elixirc_paths(_), do: ["lib", "web"]
 
   # Configuration for the OTP application
   #
@@ -21,6 +26,7 @@ defmodule Ode.Mixfile do
                     :postgrex,
                     :ecto,
                     :tzdata
+                    :ex_machina
                    ],
      mod: {Ode, []}
     ]
@@ -42,7 +48,8 @@ defmodule Ode.Mixfile do
       {:ecto, "~> 2.0.0"},
       {:postgrex, ">= 0.0.0"},
       {:timex, "~> 3.0"},
-      {:tzdata, "~> 0.1.8", override: true}
+      {:tzdata, "~> 0.1.8", override: true},
+      {:ex_machina, "~> 1.0"}
     ]
   end
 end
