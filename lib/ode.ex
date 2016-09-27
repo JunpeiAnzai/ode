@@ -2,7 +2,10 @@ defmodule Ode do
   use Application
   require Logger
 
-  @config_file_path "./config.json"
+  @config_file_path "./conf"
+  @config_skip_dir "skip_dir"
+  @config_skip_file "skip_file"
+
   @sync_dir_path "~/ode_sync"
 
   def start(_type, _args) do
@@ -22,12 +25,12 @@ defmodule Ode do
     |> parse_args
     |> process
 
+    :ets.new(:file_list, [:set, :protected, :named_table])
     config = read_config
 
     :ets.new(:tokens, [:set, :protected, :named_table])
     OneDriveApi.read_token
 
-    :ets.new(:file_list, [:set, :protected, :named_table])
 
     Logger.debug "Opening the item database"
 
@@ -66,13 +69,26 @@ defmodule Ode do
     process (tl options)
   end
 
-  def read_config() do
-    case File.read(@config_file_path) do
-      {:ok, body} ->
-        Poison.decode!(body)
-      {:error, reason} ->
-        reason
-    end
+  def read_config do
+    File.stream!(@config_file_path)
+    |> Stream.each(fn(line) ->
+      cond do
+        String.starts_with?(line, @config_skip_dir) ->
+          skip_dir =
+            line
+            |> String.trim
+            |> String.trim_leading(@config_skip_dir <> "=")
+          IO.inspect is_binary skip_dir
+          :ets.insert(:file_list, {:skip_dir_regex, skip_dir})
+        String.starts_with?(line, @config_skip_file) ->
+          skip_file =
+            line
+            |> String.trim
+            |> String.trim_leading(@config_skip_file <> "=")
+          :ets.insert(:file_list, {:skip_file_regex, skip_file})
+      end
+    end)
+    |> Stream.run
   end
 
   def perform_sync(retry_count) do

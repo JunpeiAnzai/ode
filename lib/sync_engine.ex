@@ -317,7 +317,33 @@ defmodule SyncEngine do
 
   def scan_for_differences(path \\ ".") do
     Logger.debug "Uploading differences"
+    case ItemDB.select_by_path(path) do
+      {:ok, item}
+        -> upload_differences(item)
+      _
+        -># upload_new_items(path)
+    end
+  end
 
-
+  def upload_differences(item) do
+    Logger.debug item.id <> " " <> item.name
+    path = ItemDB.compute_path(item.id)
+    should_skip? = if item.is_dir do
+      skip_dir_regex =
+        Keyword.get(
+          :ets.lookup(:file_list, {:skip_dir_regex}), :skip_dir_regex)
+      if not is_nil(skip_dir_regex) and String.match?(path, skip_dir_regex) do
+        true
+      end
+      false
+    else
+      skip_file_regex =
+        Keyword.get(
+          :ets.lookup(:file_list, {:skip_file_regex}), :skip_file_regex)
+      if not is_nil(skip_file_regex) and String.match?(path, skip_file_regex) do
+        true
+      end
+      false
+    end
   end
 end
