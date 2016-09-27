@@ -37,9 +37,12 @@ defmodule ItemDB do
   end
 
   def select_by_path(path, candidates \\ nil) do
+    # a path has many candidates
+
+    candidates_list =
     if is_nil candidates do
-      candidates = {}
-      path =
+      new_candidates = {}
+      new_path =
         "root/" <> String.trim_leading(path, ".")
         |> Path.basename
 
@@ -49,31 +52,55 @@ defmodule ItemDB do
         select: [i.id, i.parent_id]
       )
 
-      path = Path.dirname(path)
-      Tuple.append(candidates, ids)
+      new_path = Path.dirname(new_path)
+      Tuple.append(new_candidates, ids)
+
+      Keyword.new(path: new_path, candidates: new_candidates)
+    else
+      Keyword.new(path: path, candidates: candidates)
     end
 
-    if path != "." do
+    candidates_list =
+    if candidates_list.path != "." do
       # discard the candidates that do not have the correct parent
-      Enum.map(candidates, fn(candidate) ->
-        parent_path = Path.basename(path)
+      child_path = candidates_list.path
+      new_candidates = candidates_list.candidates
+      |> Enum.map(fn(candidate) ->
+        parent_path = Path.basename(child_path)
         parent_id = tl candidate
-        parent_item = Repo.one(
-          from i in Item,
-          where: i.name == ^parent_path and i.id == ^parent_id,
-          select: i.parent_id
-        )
+        parent_item =
+          Repo.one(
+            from i in Item,
+            where: i.name == ^parent_path and i.id == ^parent_id,
+            select: i.parent_id
+          )
         [hd(candidate), parent_item]
       end)
       |> Enum.reject(fn(candidate) -> is_nil(tl candidate) end)
-      path = Path.dirname(path)
+
+      new_path = Path.dirname(child_path)
+
+      Keyword.new(path: new_path, candidates: new_candidates)
+    else
+      candidates_list
     end
 
     if path != "." do
-      select_by_path(path, candidates)
+      select_by_path(candidates_list.path, candidates_list.candidates)
     end
 
     # reached the root
+    new_candidates =
+      candidates_list.candidates
+      |> Enum.filter(fn(candidate) -> is_nil(tl candidate) end)
+
+    return_item = if length new_candidates == 1 do
+      select_by_id(elem(candidates, 0) |> hd)
+    else
+      nil
+    end
+
+    return_item
   end
 
   def delete_by_id(id) do
