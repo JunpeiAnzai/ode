@@ -29,92 +29,17 @@ defmodule OneDriveApi do
 
   defmodule OneDriveSync do
     use HTTPoison.Base
-
-    @fields ~w(
-      value
-      @odata.nextLink
-      @odata.deltaLink
-      @delta.token
-      @odata.context
-    )
-    @fields_value ~w(
-      cTag
-      eTag
-      file
-      fileSystemInfo
-      id
-      name
-      parentReference
-    )
-    @fields_file_system_info ~w(
-      createdDateTime
-      lastModifiedDateTime
-    )
-    @fields_parent_reference ~w(
-      driveId
-      id
-    )
-    @fields_file ~w(
-      hashes
-      mimeType
-    )
-    @fields_hashes ~w(
-      crc32Hash
-      sha1Hash
-    )
-
-    def process_request_headers(access_token) do
-      [Authorization: access_token]
+    def process_request_headers(headers) do
+      headers
+      |> add_access_token
     end
 
-    def process_response_body(body) do
-      body
-      |> Poison.decode!
-      |> process_map(@fields)
-      |> Keyword.update!(:value, fn(values)
-        -> values
-        |> Enum.map(fn(value) -> process_value(value) end)
-      end)
-    end
-
-    def process_map(map, keywords) do
-      map
-      |> Map.take(keywords)
-      |> Enum.map(fn{k, v} -> {String.to_atom(k), v} end)
-    end
-
-    def process_value(value) do
-      value
-      |> process_map(@fields_value)
-      |> process_keyword_list(@fields_file_system_info, :fileSystemInfo)
-      |> process_keyword_list(@fields_parent_reference, :parentReference)
-      |> process_keyword_list(@fields_file, :file)
-      |> process_hash
-    end
-
-    def process_keyword_list(list, keywords, key) do
-      case Keyword.has_key?(list, key) do
-        :true ->
-          list
-          |> Keyword.update!(key, fn(map)
-            -> map
-            |> process_map(keywords)
-          end)
-        :false ->
-          list
-      end
-    end
-
-    def process_hash(list) do
-      case Keyword.has_key?(list, :file) do
-        :true ->
-          list[:file]
-          |> Keyword.update!(:hashes, fn(map)
-            -> map
-            |> process_map(@fields_hashes)
-          end)
-        :false -> list
-      end
+    def add_access_token(headers) do
+      access_token =
+        Keyword.get(
+          :ets.lookup(:tokens, :access_token), :access_token)
+      headers
+      |> Keyword.merge([Authorization: access_token])
     end
   end
 
@@ -184,6 +109,61 @@ defmodule OneDriveApi do
     access_token =
       Keyword.get(:ets.lookup(:tokens, :access_token), :access_token)
     OneDriveSync2.get!(url, access_token)
+  end
+
+  def delete_by_id(id, etag) do
+    check_token
+    url = @item_by_id_url <> id
+    headers = unless is_nil(etag) do
+      ["If-Match": etag]
+    else
+      []
+    end
+
+    response = OneDriveSync.delete!(url, headers)
+
+    IO.inspect response
+  end
+
+  def simple_upload(local_path, remote_path, etag \\ nil) do
+    check_token
+
+    stat = File.lstat!(local_path)
+    body = File.read!(local_path)
+    headers = [
+      "Content-Type": "application/octet-stream",
+      "Content-Length": stat.size
+    ]
+    url =
+      @item_by_path_url <> URI.encode(remote_path) <> ":/content"
+    <> unless is_nil(etag) do
+      Keyword.merge(headers, ["If-Match": etag])
+      ""
+    else
+      "?@name.conflictBehavior=fail"
+    end
+
+    OneDriveSync.put!(url, body, headers)
+  end
+
+  def update_by_id(id, body, ctag \\ nil) do
+    check_token
+
+    url = @item_by_id_url <> id
+
+    headers = ["Content-Type": "application/json"]
+    unless is_nil(ctag) do
+      Keyword.merge(headers, ["If-Match": ctag])
+    end
+
+    OneDriveSync.patch!(url, body, headers)
+  end
+
+  def create_by_path(parent_path, body) do
+    url = @item_by_path_url <> URI.encode(parent_path) <> ":/children"
+    headers = ["Content-Type": "application/json"]
+
+    OneDriveSync.post!(url, body, headers)
   end
 
   def read_token do

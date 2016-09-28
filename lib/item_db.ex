@@ -29,8 +29,22 @@ defmodule ItemDB do
     |> Ecto.Changeset.change(changeset)
     |> Repo.update!
   end
-  def upsert
-  def select_children
+
+  def upsert(item) do
+    if is_nil(Repo.get!(Item, item.id)) do
+      insert(item)
+    else
+      update(item)
+    end
+  end
+
+  def select_children(id) do
+    Repo.all(
+      from i in Item,
+      where: i.parent_id == ^id,
+      select: [i]
+    )
+  end
 
   def select_by_id(id) do
     Repo.get(Item, id)
@@ -95,7 +109,7 @@ defmodule ItemDB do
       |> Enum.filter(fn(candidate) -> is_nil(tl candidate) end)
 
     return_item = if length new_candidates == 1 do
-      select_by_id(elem(candidates, 0) |> hd)
+     {:ok, select_by_id(elem(candidates, 0) |> hd)}
     else
       nil
     end

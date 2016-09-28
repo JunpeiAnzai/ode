@@ -78,7 +78,6 @@ defmodule Ode do
             line
             |> String.trim
             |> String.trim_leading(@config_skip_dir <> "=")
-          IO.inspect is_binary skip_dir
           :ets.insert(:file_list, {:skip_dir_regex, skip_dir})
         String.starts_with?(line, @config_skip_file) ->
           skip_file =

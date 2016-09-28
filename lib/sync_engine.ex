@@ -5,6 +5,8 @@ defmodule SyncEngine do
     defstruct value: nil, old_item: nil, is_dir: false, path: nil, is_cached: false, is_root: false
   end
 
+  @threshold_file_size 10 * :math.pow(2, 20) # 10 MiB
+
   def apply_differences do
     Logger.debug "Applying differences"
 
@@ -197,7 +199,7 @@ defmodule SyncEngine do
         skip_file_regex =
           Keyword.get(
             :ets.lookup(:file_list, {:skip_file_regex}), :skip_file_regex)
-        if not is_nil(skip_file_regex) and String.match?(path, skip_file_regex) do
+        if String.match?(path, skip_file_regex) do
           {:skip}
         else
           items = %{items | is_dir: false}
@@ -207,7 +209,7 @@ defmodule SyncEngine do
         skip_dir_regex =
           Keyword.get(
             :ets.lookup(:file_list, {:skip_dir_regex}), :skip_dir_regex)
-        if not is_nil(skip_dir_regex) and String.match?(path, skip_dir_regex) do
+        if String.match?(path, skip_dir_regex) do
           skip_item =
             :ets.lookup(:file_list, :to_skip_id)
             |> Tuple.append(items.value["id"])
@@ -321,29 +323,195 @@ defmodule SyncEngine do
       {:ok, item}
         -> upload_differences(item)
       _
-        -># upload_new_items(path)
+        -> upload_new_items(path)
     end
   end
 
   def upload_differences(item) do
     Logger.debug item.id <> " " <> item.name
     path = ItemDB.compute_path(item.id)
-    should_skip? = if item.is_dir do
-      skip_dir_regex =
-        Keyword.get(
-          :ets.lookup(:file_list, {:skip_dir_regex}), :skip_dir_regex)
-      if not is_nil(skip_dir_regex) and String.match?(path, skip_dir_regex) do
-        true
-      end
-      false
+    skip_regex = if item.is_dir do
+      Keyword.get(
+        :ets.lookup(
+          :file_list, {:skip_dir_regex}), :skip_dir_regex)
     else
-      skip_file_regex =
-        Keyword.get(
-          :ets.lookup(:file_list, {:skip_file_regex}), :skip_file_regex)
-      if not is_nil(skip_file_regex) and String.match?(path, skip_file_regex) do
-        true
+      Keyword.get(
+        :ets.lookup(
+          :file_list, {:skip_file_regex}), :skip_file_regex)
+    end
+
+    unless String.match?(path, skip_regex) do
+      if item.is_dir do
+        upload_dir_differences(item, path)
+      else
+        upload_file_differences(item, path)
       end
-      false
+    end
+  end
+
+  def upload_dir_differences(item, path) do
+    if File.exists?(path) do
+      if File.dir?(path) do
+        upload_delete_item(item, path)
+        upload_new_file(path)
+      else
+        ItemDB.select_children(item.id)
+        |> Enum.each(fn(item) -> item |> upload_differences end)
+      end
+    else
+      upload_delete_item(item, path)
+    end
+  end
+
+  def upload_file_differences(item, path) do
+    if File.exists?(path) do
+      unless File.dir?(path) do
+        stat = File.lstat!(path)
+        unless stat.mtime == item.mtime |> Ecto.DateTime.to_erl do
+          Logger.debug "The file last modified time has changed"
+          item = unless crc32(path) == item.crc32 do
+            Logger.debug "The file content has changed"
+            Logger.debug "Uploading: #{path}"
+            #    if stat.size <= @threshold_file_size do
+            new_item =
+              OneDriveApi.simple_upload(path, path)
+              |> parse_response
+            #    else
+            #      Session.upload(path, path)
+            #    end
+            save_item(new_item)
+
+            new_item
+          end
+          upload_last_modified_time(item, stat.mtime)
+        else
+          Logger.debug "The file has not changed"
+        end
+      else
+        Logger.debug "The item was a file but now is a directory"
+        upload_delete_item(item, path)
+        upload_create_dir(path)
+      end
+    else
+      Logger.debug "The file has been deleted"
+      upload_delete_item(item, path)
+    end
+  end
+
+  def parse_response(response) do
+    id = response["id"]
+    is_dir = Map.has_key?(response, "folder")
+    name = response["name"]
+    etag = response["eTag"]
+    ctag = response["cTag"]
+    mtime =
+      response["fileSystemInfo"]["lastModifiedDateTime"]
+      |> Timex.parse!("{ISO:Extended:Z}")
+      |> Timex.local
+      |> Timex.to_erl
+      |> Ecto.DateTime.from_erl
+    parent_id = response["parentReference"]["id"]
+    crc32 = unless is_dir do
+      response["file"]["hashes"]["crc32Hash"]
+    end
+
+    %Ode.Item{
+      id: id,
+      is_dir: is_dir,
+      name: name,
+      etag: etag,
+      ctag: ctag,
+      mtime: mtime,
+      parent_id: parent_id,
+      crc32: crc32
+    }
+  end
+
+  def upload_delete_item(item, path) do
+    Logger.debug "Deleting remote item: #{path}"
+
+    OneDriveApi.delete_by_id(item.id, item.etag)
+
+    ItemDB.delete_by_id(item.id)
+  end
+
+  def upload_new_file(path) do
+    Logger.debug "Uploading: #{path}"
+    stat = File.lstat!(path)
+#    if stat.size <= @threshold_file_size do
+    new_item =
+      OneDriveApi.simple_upload(path, path)
+      |> parse_response
+#    else
+#      Session.upload(path, path)
+#    end
+
+    save_item(new_item)
+
+    upload_last_modified_time(new_item, stat.mtime) # stat.mtime is utc
+  end
+
+  def save_item(item) do
+    item
+    |> ItemDB.upsert
+  end
+
+  def upload_last_modified_time(item, mtime) do
+    mtime_iso = mtime |> DateTime.to_iso8601
+    mtime_info = [
+      "fileSystemInfo": [
+        "lastModifiedDateTime": mtime_iso
+      ]]
+    |> Poison.encode!
+
+    OneDriveApi.update_by_id(item.id, mtime_info, item.ctag)
+    |> parse_response
+    |> save_item
+  end
+
+  def upload_create_dir(path) do
+    Logger.debug "Creating remote directory: #{path}"
+    name = Path.basename(path)
+    body = [
+      name: name,
+      folder: nil
+    ]
+    |> Poison.encode!
+
+    remote_name = Path.dirname(path) <> "/"
+    OneDriveApi.create_by_path(remote_name, body)
+    |> parse_response
+    |> save_item
+  end
+
+  def upload_new_items(path) do
+    if File.exists?(path) do
+      skip_regex = if File.dir?(path) do
+        Keyword.get(
+          :ets.lookup(
+            :file_list, {:skip_dir_regex}), :skip_dir_regex)
+      else
+        Keyword.get(
+          :ets.lookup(
+            :file_list, {:skip_file_regex}), :skip_file_regex)
+      end
+
+      unless String.match?(path, skip_regex) do
+        if File.dir?(path) do
+          unless is_nil(ItemDB.select_by_path(path)) do
+            upload_create_dir(path)
+          end
+          Path.split(path)
+          |> Enum.each(fn(dir_name) ->
+            dir_name
+            |> upload_new_items
+          end)
+        else
+          unless is_nil(ItemDB.select_by_path(path)) do
+            upload_new_file(path)
+          end
+        end
+      end
     end
   end
 end
